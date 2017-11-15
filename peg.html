@@ -4,14 +4,18 @@
 var LOG = 0
 // GRAMMAR
 var defGrammar = {
-	Start   :o=>o.Dialog,
-	Dialog  :o=>o('Dialog') && o.many(o=>o.eat(' ')) && o.Name && o.ws && o.Block,
-	Name	:o=>(o('a', 'z') || o('A', 'Z')) && o.any(o=>o('a', 'z') || o('A', 'Z') || o('0', '9')),
-	Block	:o=>o.ws && o('do') && o.ws && o.eat('\n') && 
-			o.any(o=>o.Say) && 
-			o.ws && o('end') && o.ws && o.many(o=>o.eat('\n')),
-	Say     :o=>o.ws && o('say') && o.ws && o.String && o.ws && o.eat('\n'),
-	String  :o=>o('"') && o.any(o=>o.inv('"')) && o('"')
+	Start   	:o=>o.Dialog,
+	Dialog  	:o=>o('Dialog') && o.many(o=>o.eat(' ')) && o.Name && o.ws && o.Block,
+	Name		:o=>(o('a', 'z') || o('A', 'Z')) && o.any(o=>o('a', 'z') || o('A', 'Z') || o('0', '9')),
+	Block		:o=>o.ws && o('do') && o.ws && o.eat('\n') && 
+				o.any(o=>o.Statemnt || o.Assign)
+				o.ws && o('end') && o.ws && o.many(o=>o.eat('\n')),
+	String  	:o=>o('"') && o.any(o=>o.inv('"')) && o('"')
+	Statemnt	:o=>o.any(o=>o.Say)
+	Expr 		:o=>o.any(o=>o.Ask)
+	Say     	:o=>o.ws && o('say') && o.ws && o.String,
+	Ask     	:o=>o.ws && o('ask') && o.ws && o.String,
+	Assign		:o=>o.ws && o.Name && o.ws && o('=') && o.ws && o.Expr && o.eat('\n')
 
 	// Start   :o=>o.Form,
 	// ws      :o=>o.fold(o=>o.any(o=>o.eat(' ') || o.eat('\t'))),
@@ -46,7 +50,9 @@ var defGrammar = {
 // Input form
 var inputSource = 
 'Dialog main do\n' + 
-'  say "Hello world"\n' + 
+'  say "Hello"\n' +
+'  say "Brave new world"\n' +
+'  response = ask "How are you doing?"'
 'end\n'
 
 function makeParser(rules) {
