@@ -1,0 +1,208 @@
+<html>
+<body>
+<script>
+var LOG = 0
+// GRAMMAR
+var defQL = {
+	Start   :o=>o.Dialog,
+	Dialog  :o=>o('Dialog') && o.many(o=>o.eat(' ')) && o.Name && o.ws && o.Block,
+	Name	:o=>(o('a', 'z') || o('A', 'Z')) && o.any(o=>o('a', 'z') || o('A', 'Z') || o('0', '9')),
+	Block	:o=>o.ws && o('do') && o.ws && o.eat('\n') && 
+			o.any(o=>o.Say) && 
+			o.ws && o('end') && o.ws && o.many(o=>o.eat('\n')),
+	Say     :o=>o.ws && o('say') && o.ws && o.String && o.ws && o.eat('\n')
+
+
+	// Start   :o=>o.Form,
+	// ws      :o=>o.fold(o=>o.any(o=>o.eat(' ') || o.eat('\t'))),
+	// Form    :o=>o('form') && o.many(o=>o.eat(' ')) && o.Id && o.ws && o.Body,
+	// Body    :o=>o.ws && o('{') && o.ws && o.eat('\n') && 
+	// 	o.any(o=>o.Answer || o.Question || o.Message || o.If) && 
+	// 	o.ws && o('}') && o.ws && o.many(o=>o.eat('\n')),
+	// Question:o=>o.ws && o.String && o.ws && o.eat('\n') && 
+	// 	o.ws && o.Id && o.eat(':') && o.ws && o.Type && o.eat('\n'),
+	// Answer  :o=>o.ws && o.String && o.ws && o.eat('\n') && 
+	// 	o.ws && o.Id && o.eat(':') && o.ws && o.Type && o.ws && o.eat('=') && o.ws && o.eat('\n') && 
+	// 	o.ws && o.Expr && o.eat('\n'),
+	// Message :o=>o.ws && o.String && o.ws && o.eat('\n'),
+	// If      :o=>o.ws && o('if') && o.ws && o('(') && o.ws && o.Logic && o.ws && o(')') && o.Body,
+	// String  :o=>o('"') && o.any(o=>o.inv('"')) && o('"'),
+	// Type    :o=>(o('boolean') || o('money')),
+	// Id      :o=>(o('a', 'z') || o('A', 'Z')) && o.any(o=>o('a', 'z') || o('A', 'Z') || o('0', '9')),
+	// Number  :o=>(o.zeroOrOne(o=>o('-')) && o.many(o=>o('0', '9')) && o.zeroOrOne(o=>o('.') && o.many(o=>o('0', '9')))),
+	// Logic   :o=>o.fold(o=>o.Or),
+	// Or      :o=>o.fold(o=>o.And && o.any(o=>o.ws && o('||') && o.ws && o.And)),
+	// And     :o=>o.fold(o=>o.Cmp && o.any(o=>o.ws && o('&&') && o.ws && o.Cmp)),
+	// Cmp     :o=>o.fold(o=>o.LogicS && o.zeroOrOne(o=>o.ws && (o('<=') || o('<') || o('>=') || o('>') || o('!=')) && o.ws && o.LogicS)),
+	// LogicS  :o=>o.fold(o=>o.NotId || o.Number || o('(') && o.Logic && o(')')),
+	// NotId   :o=>o.empty(o=>o.zeroOrOne(o=>o('!')) && o.ws && o.Id, 1),
+	// Expr    :o=>o.fold(o=>o.Sum),
+	// Sum     :o=>o.fold(o=>o.Prod && o.any(o=>o.ws && (o('+') || o('-')) && o.ws && o.Prod)),
+	// Prod    :o=>o.fold(o=>o.ExprS && o.any(o=>o.ws && (o('*') || o('/')) && o.ws && o.ExprS)),
+	// ExprS   :o=>o.fold(o=>o.Id || o.Number || o('(') && o.Expr && o(')'))
+}
+
+
+// Input form
+this.form = 
+'Dialog main do\n' + 
+'  say "Hello world"\n' + 
+'end\n'
+
+
+function makeParser(rules) {
+	
+	function p(a, b, eat, inv) {
+		var input = p.input
+		if(p.pos > input.length) return false
+		if(typeof b === 'string') { // range
+			var c = input.charCodeAt(p.pos)
+			var cin = c >= a.charCodeAt(0) && c <= b.charCodeAt(0)
+			if(inv && !cin || !inv && cin) {
+				if(!eat) p.ast.value += input.charAt(p.pos)
+				if(LOG) _='[' + input.charAt(p.pos) + ']' + input.slice(p.pos + 1)
+				p.pos++
+				return true
+			}
+			if(LOG) _='!' + input.charAt(p.pos) + '!' + input.slice(p.pos + 1)
+			return false
+		}
+		var s = ''
+		for(var i = 0, pos = p.pos;i < a.length;i++,pos++){ // string match
+			s += input.charAt(pos)
+			var cin = input.charCodeAt(pos) !== a.charCodeAt(i)
+			if(inv && !cin || !inv && cin) {
+				if(LOG) _='!' + s + '!' + input.slice(p.pos + s.length)
+				return false
+			}
+		}
+		if(LOG) _='[' + s + ']' + input.slice(p.pos + s.length)
+		
+		if(!eat) p.ast.value += s
+		if(pos > p.last) p.last = pos
+		p.pos = pos
+		return true
+	}
+	
+	p.eat = function(a, b) {
+		return p(a, b, true)
+	}
+	
+	p.inv = function(a, b) {
+		return p(a, b, false, true)
+	}
+	
+	p.parse = function(input) {
+		p.input = input
+		p.pos = 0
+		p.last = 0
+		var ast = p.ast = {n:[]}
+		p.fail = []
+		p.stack = []
+		p.Start
+		return ast.n[0]
+	}
+	
+	p.fold = function(fn) {
+		if(fn(p)) {
+			if(p.ast.n.length < 2) return 0
+			return true
+		}
+		return false
+	}
+	
+	p.empty = function(fn) {
+		if(fn(p)) {
+			if(p.ast.value.length == 0) return 0
+			return true
+		}
+		return false
+	}
+	p.__defineGetter__('ws', function() {
+		var input = p.input
+		while(p.pos < input.length && (input.charCodeAt(p.pos) === 32 || input.charCodeAt(p.pos) === 9)){
+			p.pos++
+		}
+		return true
+	})
+	
+	p.any = function(fn) { //zero or more
+		while(fn(p)){}
+		return true
+	}
+	
+	p.many = function(fn) { //one or more
+		var c = 0
+		while(fn(p)){c++}
+		return c !== 0
+	}
+	
+	p.zeroOrOne = function(fn) { //one or more
+		fn(p)
+		return true
+	}
+	
+	p.not = function(fn, b) {
+		var pos = p.pos, ret = fn(p)
+		p.pos = pos
+		return !ret
+	}
+	
+	p.and = function(fn, b) {
+		var pos = p.pos, ret = fn(p)
+		p.pos = pos
+		return ret
+	}
+	
+	p.group = function(fn) {
+		var pos = p.pos, ret = fn(p)
+		if(!ret) p.pos = pos
+		return ret
+	}
+	
+	for(var key in rules){
+		p.__defineGetter__(key, function(key) {
+			var rule = rules[key]
+			var parent = p.ast
+			var mine = p.ast = {type:key, n:[], value:'', start:pos}
+			var pos = p.pos
+			p.stack.push(key)
+			var ret = rule(p)
+			p.ast = parent
+			if(ret === true) {
+				mine.end = pos
+				parent.n.push(mine)
+				parent[key] = mine
+				p.stack.pop()
+				return true
+			}
+			else if(ret === 0) {
+				var sub = mine.n[0]
+				if(sub) parent.n.push(mine.n[0])
+				p.stack.pop()
+				return true
+			}
+			p.fail.push(p.stack.join('/'))
+			p.stack.pop()
+			p.pos = pos
+			return false
+		}.bind(this, key))
+	}
+	
+	return p
+}
+
+
+this.parserQL = makeParser(defQL)
+this.astQL = this.parserQL.parse(this.form)
+
+function dumpAst(node, d){
+	document.body.innerHTML += '<span>'+Array(d).join('&nbsp&nbsp&nbsp') + node.type + ':' + node.value+'</span><br/>'
+	for(let i = 0;i < node.n.length;i++){
+		dumpAst(node.n[i], d + 1)
+	}
+}
+dumpAst(this.astQL.n[0], 0)
+</script>
+</body>
+</html>
