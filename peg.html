@@ -204,7 +204,7 @@ var serializeAST = {
 		var n = node.n
 		for(var i = 0; i < n.length; i++){
 			var arg = n[i]
-			ret += ' ' + serializeAST[arg.type](arg)
+			ret += ' ' + this[arg.type](arg)
 		}
 		return ret
 	},
@@ -216,14 +216,14 @@ var serializeAST = {
 		var n = node.n
 		for(var i = 0; i < n.length; i++){
 			var stmt = n[i]
-			ret += this.indent + serializeAST[stmt.type](stmt) + '\n'
+			ret += this.indent + this[stmt.type](stmt) + '\n'
 		}
 		this.indent = indent
 		ret += indent + 'end\n'
 		return ret
 	},
 	'Dialog':function(node){
-		return 'Dialog ' + serializeAST.Name(node.Name) + ' ' + serializeAST.Block(node.Block)
+		return 'Dialog ' + this.Name(node.Name) + ' ' + this.Block(node.Block)
 	}
 }
 
@@ -241,7 +241,7 @@ dumpAst(ast.n[0], 0)
 // lets modify the name of the dialog:
 ast.Dialog.Name.value = 'myDialog'
 
-document.body.innerHTML += '<span>----- Reserialized -----<br/>'+ serializeAST[ast.n[0].type](ast.n[0]).replace(/\n/g,'<br/>').replace(/ /g,'&nbsp;')+'</span>'
+document.body.innerHTML += '<span>----- Reserialized -----<br/>'+ serializeAST.Dialog(ast.Dialog).replace(/\n/g,'<br/>').replace(/ /g,'&nbsp;')+'</span>'
 
 
 
