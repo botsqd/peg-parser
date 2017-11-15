@@ -3,14 +3,14 @@
 <script>
 var LOG = 0
 // GRAMMAR
-var defQL = {
+var defGrammar = {
 	Start   :o=>o.Dialog,
 	Dialog  :o=>o('Dialog') && o.many(o=>o.eat(' ')) && o.Name && o.ws && o.Block,
 	Name	:o=>(o('a', 'z') || o('A', 'Z')) && o.any(o=>o('a', 'z') || o('A', 'Z') || o('0', '9')),
 	Block	:o=>o.ws && o('do') && o.ws && o.eat('\n') && 
 			o.any(o=>o.Say) && 
 			o.ws && o('end') && o.ws && o.many(o=>o.eat('\n')),
-	Say     :o=>o.ws && o('say') && o.ws && o.String && o.ws && o.eat('\n')
+	Say     :o=>o.ws && o('say') && o.ws && o.String && o.ws && o.eat('\n'),
 
 
 	// Start   :o=>o.Form,
@@ -26,7 +26,7 @@ var defQL = {
 	// 	o.ws && o.Expr && o.eat('\n'),
 	// Message :o=>o.ws && o.String && o.ws && o.eat('\n'),
 	// If      :o=>o.ws && o('if') && o.ws && o('(') && o.ws && o.Logic && o.ws && o(')') && o.Body,
-	// String  :o=>o('"') && o.any(o=>o.inv('"')) && o('"'),
+	String  :o=>o('"') && o.any(o=>o.inv('"')) && o('"')
 	// Type    :o=>(o('boolean') || o('money')),
 	// Id      :o=>(o('a', 'z') || o('A', 'Z')) && o.any(o=>o('a', 'z') || o('A', 'Z') || o('0', '9')),
 	// Number  :o=>(o.zeroOrOne(o=>o('-')) && o.many(o=>o('0', '9')) && o.zeroOrOne(o=>o('.') && o.many(o=>o('0', '9')))),
@@ -44,11 +44,10 @@ var defQL = {
 
 
 // Input form
-this.form = 
+var inputSource = 
 'Dialog main do\n' + 
 '  say "Hello world"\n' + 
 'end\n'
-
 
 function makeParser(rules) {
 	
@@ -60,11 +59,9 @@ function makeParser(rules) {
 			var cin = c >= a.charCodeAt(0) && c <= b.charCodeAt(0)
 			if(inv && !cin || !inv && cin) {
 				if(!eat) p.ast.value += input.charAt(p.pos)
-				if(LOG) _='[' + input.charAt(p.pos) + ']' + input.slice(p.pos + 1)
 				p.pos++
 				return true
 			}
-			if(LOG) _='!' + input.charAt(p.pos) + '!' + input.slice(p.pos + 1)
 			return false
 		}
 		var s = ''
@@ -72,13 +69,10 @@ function makeParser(rules) {
 			s += input.charAt(pos)
 			var cin = input.charCodeAt(pos) !== a.charCodeAt(i)
 			if(inv && !cin || !inv && cin) {
-				if(LOG) _='!' + s + '!' + input.slice(p.pos + s.length)
 				return false
 			}
 		}
-		if(LOG) _='[' + s + ']' + input.slice(p.pos + s.length)
-		
-		if(!eat) p.ast.value += s
+				if(!eat) p.ast.value += s
 		if(pos > p.last) p.last = pos
 		p.pos = pos
 		return true
@@ -193,8 +187,45 @@ function makeParser(rules) {
 }
 
 
-this.parserQL = makeParser(defQL)
-this.astQL = this.parserQL.parse(this.form)
+var parser = makeParser(defGrammar)
+var ast = parser.parse(inputSource)
+
+var serializeAST = {
+	indentChar:'   ',
+	indent:'',
+	'Name': function(node){
+		return node.value
+	},
+	'String': function(node){
+		return node.value 
+	},
+	'Say': function(node){
+		var ret = 'say'
+		var n = node.n
+		for(var i = 0; i < n.length; i++){
+			var arg = n[i]
+			ret += ' ' + serializeAST[arg.type](arg)
+		}
+		return ret
+	},
+	'Block': function(node){
+		var indent = this.indent
+		this.indent += this.indentChar
+
+		var ret ='do\n'
+		var n = node.n
+		for(var i = 0; i < n.length; i++){
+			var stmt = n[i]
+			ret += this.indent + serializeAST[stmt.type](stmt) + '\n'
+		}
+		this.indent = indent
+		ret += indent + 'end\n'
+		return ret
+	},
+	'Dialog':function(node){
+		return 'Dialog ' + serializeAST.Name(node.Name) + ' ' + serializeAST.Block(node.Block)
+	}
+}
 
 function dumpAst(node, d){
 	document.body.innerHTML += '<span>'+Array(d).join('&nbsp&nbsp&nbsp') + node.type + ':' + node.value+'</span><br/>'
@@ -202,7 +233,18 @@ function dumpAst(node, d){
 		dumpAst(node.n[i], d + 1)
 	}
 }
-dumpAst(this.astQL.n[0], 0)
+document.body.innerHTML += '<span>---- AST -----</span><br/>'
+
+dumpAst(ast.n[0], 0)
+
+
+// lets modify the name of the dialog:
+ast.Dialog.Name.value = 'myDialog'
+
+document.body.innerHTML += '<span>----- Reserialized -----<br/>'+ serializeAST[ast.n[0].type](ast.n[0]).replace(/\n/g,'<br/>').replace(/ /g,'&nbsp;')+'</span>'
+
+
+
 </script>
 </body>
 </html>
