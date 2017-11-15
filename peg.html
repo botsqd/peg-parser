@@ -8,11 +8,11 @@ var defGrammar = {
 	Dialog  	:o=>o('Dialog') && o.many(o=>o.eat(' ')) && o.Name && o.ws && o.Block,
 	Name		:o=>(o('a', 'z') || o('A', 'Z')) && o.any(o=>o('a', 'z') || o('A', 'Z') || o('0', '9')),
 	Block		:o=>o.ws && o('do') && o.ws && o.eat('\n') && 
-				o.any(o=>o.Statemnt || o.Assign)
+				o.any(o=>o.Statemnt || o.Assign) &&
 				o.ws && o('end') && o.ws && o.many(o=>o.eat('\n')),
-	String  	:o=>o('"') && o.any(o=>o.inv('"')) && o('"')
-	Statemnt	:o=>o.any(o=>o.Say)
-	Expr 		:o=>o.any(o=>o.Ask)
+	String  	:o=>o('"') && o.any(o=>o.inv('"')) && o('"'),
+	Statemnt	:o=>o.any(o=>o.Say),
+	Expr 		:o=>o.any(o=>o.Ask),
 	Say     	:o=>o.ws && o('say') && o.ws && o.String,
 	Ask     	:o=>o.ws && o('ask') && o.ws && o.String,
 	Assign		:o=>o.ws && o.Name && o.ws && o('=') && o.ws && o.Expr && o.eat('\n')
