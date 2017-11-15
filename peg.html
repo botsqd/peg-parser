@@ -10,8 +10,8 @@ var defQL = {
 	Block	:o=>o.ws && o('do') && o.ws && o.eat('\n') && 
 			o.any(o=>o.Say) && 
 			o.ws && o('end') && o.ws && o.many(o=>o.eat('\n')),
-	Say     :o=>o.ws && o('say') && o.ws && o.String && o.ws && o.eat('\n')
-
+	Say     :o=>o.ws && o('say') && o.ws && o.String && o.ws && o.eat('\n'),
+	String  :o=>o('"') && o.any(o=>o.inv('"')) && o('"')
 
 	// Start   :o=>o.Form,
 	// ws      :o=>o.fold(o=>o.any(o=>o.eat(' ') || o.eat('\t'))),
