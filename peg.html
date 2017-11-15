@@ -11,7 +11,7 @@ var defGrammar = {
 			o.any(o=>o.Say) && 
 			o.ws && o('end') && o.ws && o.many(o=>o.eat('\n')),
 	Say     :o=>o.ws && o('say') && o.ws && o.String && o.ws && o.eat('\n'),
-
+	String  :o=>o('"') && o.any(o=>o.inv('"')) && o('"')
 
 	// Start   :o=>o.Form,
 	// ws      :o=>o.fold(o=>o.any(o=>o.eat(' ') || o.eat('\t'))),
@@ -26,7 +26,7 @@ var defGrammar = {
 	// 	o.ws && o.Expr && o.eat('\n'),
 	// Message :o=>o.ws && o.String && o.ws && o.eat('\n'),
 	// If      :o=>o.ws && o('if') && o.ws && o('(') && o.ws && o.Logic && o.ws && o(')') && o.Body,
-	String  :o=>o('"') && o.any(o=>o.inv('"')) && o('"')
+//	String  :o=>o('"') && o.any(o=>o.inv('"')) && o('"')
 	// Type    :o=>(o('boolean') || o('money')),
 	// Id      :o=>(o('a', 'z') || o('A', 'Z')) && o.any(o=>o('a', 'z') || o('A', 'Z') || o('0', '9')),
 	// Number  :o=>(o.zeroOrOne(o=>o('-')) && o.many(o=>o('0', '9')) && o.zeroOrOne(o=>o('.') && o.many(o=>o('0', '9')))),
