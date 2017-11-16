@@ -20,14 +20,14 @@ var defGrammar = {
 
 	DoBlock		:o=>o('do') && o.ws && o.eat('\n') && o.Statements && o.ws && o('end'),
 
-	Statements  :o=>o.zeroOrMore(o=>o.ws && o('\n')) && o.zeroOrMore(o=>o.not(o=>o.eat('end') || o.eat('else')) && (o.Statement || o.CommentLine)),
+	Statements  :o=>o.zeroOrMore(o=>o.not(o=>o.eat('end') || o.eat('else')) && o.zeroOrMore(o=>o.ws && o('\n')) && (o.Statement || o.CommentLine)),
 
 	Comment     :o=>o('#') && o.zeroOrMore(o=>o.inv('\n')),
 	CommentLine :o=>o.ws && o.eat('\n') || o('#') && o.zeroOrMore(o=>o.inv('\n')) && o.eat('\n'),
 
-	Arrow       :o=>(o.ws && o.Expression && o.ws && o('->') && o.zeroOrMore(o=>o.ws && o('\n') && o.ws) && (o.CallNoParen || o.Expression)),
+	Arrow       :o=>o.ws && o.Expression && o.ws && o('->') && o.zeroOrMore(o=>o.ws && o('\n') && o.ws) && (o.CallNoParen || o.Expression),
 
-	Statement	:o=>o.ws && o.group(o=>o.Arrow || o.CallNoParen || o.Expression || o.Comment) && o.zeroOrMore(o=>o.ws && o.Comment) && o.ws && o.eat('\n'),
+	Statement	:o=>o.ws && o.group(o=>o.CallNoParen || o.Arrow || o.Expression || o.Comment) && o.zeroOrMore(o=>o.ws && o.Comment) && o.ws && o.eat('\n'),
 	
 	Attribute	:o=>o('@') && o.Id && o.rws && o.Expression && o.oneOrMore(o=>o.ws && o.eat('\n')),
 	
@@ -299,10 +299,8 @@ function makeParser(rules) {
 	}
 
 	for(var key in rules){
-		if(key.charAt(0) === '_'){
-			p.__defineGetter__(key.slice(1), rules[key])
-		}
-		else p.__defineGetter__(key, function(key) {
+
+		function getter(key, debug) {
 			
 			var pos = p.pos
 
@@ -318,9 +316,11 @@ function makeParser(rules) {
 			var ret
 			if(!mine){
 				mine = p.ast = {type:key, n:[], value:'', start:pos}
+				if(debug) console.log('No memo', p.input.slice(p.pos, p.pos + 50).replace(/\n/g,'\\n'))
 				ret = rule(p)
 			}
 			else{
+				if(debug) console.log('Memo', key)
 				p.pos = mine.end
 				ret = true
 			}
@@ -346,7 +346,15 @@ function makeParser(rules) {
 			p.stack.pop()
 			p.pos = pos
 			return false
-		}.bind(this, key))
+		}
+
+		if(key.charAt(0) === '_'){
+			p.__defineGetter__(key.slice(1), rules[key])
+		}
+		else{
+			p.__defineGetter__(key, getter.bind(this, key))
+			p.__defineGetter__('_' + key, getter.bind(this, key, true))
+		}			
 	}
 	
 	return p
