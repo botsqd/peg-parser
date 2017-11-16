@@ -1,21 +1,96 @@
 <html>
 <body>
+<script src = './devserver.js'></script>
 <script>
+function run(){
+
 var LOG = 0
+Error.stackTraceLimit=50
+window.__defineSetter__('_', function(arg){
+	var stack = new Error().stack || ''
+	// lets collect the stack
+	var st = stack.split('\n')
+	var str = ''
+	for(var i = 0; i < st.length; i++){
+		var m = st[i].match(/at (\w+)/)
+		if(m){
+			if(defGrammar[m[1]]){
+				if(str) str += '<'
+				str += m[1]
+			}
+		}
+	}
+	console.log(str + ': '+arg.replace(/\n/g, '\\n'))
+})
+
 // GRAMMAR
 var defGrammar = {
-	Start   	:o=>o.Dialog,
-	Dialog  	:o=>o('Dialog') && o.many(o=>o.eat(' ')) && o.Name && o.ws && o.Block,
-	Name		:o=>(o('a', 'z') || o('A', 'Z')) && o.any(o=>o('a', 'z') || o('A', 'Z') || o('0', '9')),
-	Block		:o=>o.ws && o('do') && o.ws && o.eat('\n') && 
-				o.any(o=>o.Statemnt || o.Assign)
-				o.ws && o('end') && o.ws && o.many(o=>o.eat('\n')),
-	String  	:o=>o('"') && o.any(o=>o.inv('"')) && o('"')
-	Statemnt	:o=>o.any(o=>o.Say)
-	Expr 		:o=>o.any(o=>o.Ask)
-	Say     	:o=>o.ws && o('say') && o.ws && o.String,
-	Ask     	:o=>o.ws && o('ask') && o.ws && o.String,
-	Assign		:o=>o.ws && o.Name && o.ws && o('=') && o.ws && o.Expr && o.eat('\n')
+	Start   	:o=>o.zeroOrMore(o=>o.ws && o('\n')) && o.zeroOrMore(o=>o.Attribute || o.Statement),
+
+	Id		    :o=>o.not(o=>o('do') || o('end') || o('if')) && (o('a', 'z') || o('A', 'Z') || o('_')) && o.zeroOrMore(o=>o('a', 'z') || o('A', 'Z') || o('0', '9') || o('_')),
+	
+	IdChain     :o=>o.fold(o=>o.Id && o.zeroOrMore(o=>o('.') && o.Id)),
+
+	PrefId      :o=>o.empty(o=>o.zeroOrOne(o=>o('!')||o('-')||o('+')) && o.ws && o.IdChain, 1),
+
+	Number      :o=>(o.zeroOrOne(o=>o('-')) && o.oneOrMore(o=>o('0', '9')) && o.zeroOrOne(o=>o('.') && o.oneOrMore(o=>o('0', '9')))),
+	Boolean     :o=>o('true') || o('false'),
+	DoBlock		:o=>o('do') && o.ws && o.eat('\n') && 
+				o.Statements &&
+				o.ws && o('end'),
+
+	String  	:o=>o('"') && o.zeroOrMore(o=>o.inv('"')) && o('"'),
+
+	Statements  :o=>o.zeroOrMore(o=>o.ws && o('\n')) && o.zeroOrMore(o=>o.not(o=>o('end') || o('else')) && o.Statement),
+
+	Comment     :o=>o('#') && o.zeroOrMore(o=>o.inv('\n')),
+
+	Statement	:o=>o.ws && o.group(o=>o.CallNoParen || o.Expression || o.Comment) && o.oneOrMore(o=>o.zeroOrMore(o=>o.ws && o.Comment) && o.ws && o.eat('\n')),
+	
+	Attribute	:o=>o('@') && o.Id && o.rws && o.Expression && o.oneOrMore(o=>o.ws && o.eat('\n')),
+	
+	Expression  :o=>o.CallParen || o.If || o.DoBlock || o.List || o.String || o.Assign || o.Logic|| o.Math || o.Atom || o.AttribRef || o.Number || o.PrefId|| o.Boolean,
+
+	List 		:o=>o('[') && o.ws && o.zeroOrOne(o=>o.Expression) && o.zeroOrMore(o=>o.ws && o(',') && o.ws && o.Expression) && o.ws && o(']'),
+
+	Label       :o=>o.Id && o(':'),
+	Atom        :o=>o(':') && o.Id,
+	AttribRef   :o=>o('@') && o.Id,
+
+	ParenArg    :o=>o.zeroOrOne(o=>o.Label && o.ws) && o.Expression,
+	CallParen   :o=>o.IdChain && o.ws && o('(') && o.ws && o.zeroOrOne(o=>o.ParenArg) && o.zeroOrMore(o=>o.ws && o(',') && o.ws && o.ParenArg) && o.ws && o(')') && o.zeroOrOne(o=>o.ws && o.DoBlock),
+
+	NoParenArg  :o=>o.zeroOrOne(o=>o.Label && o.ws) && o.Expression,
+	CallNoParen	:o=>o.IdChain && o.rws && o.NoParenArg && o.zeroOrMore(o=>( o.group(o=>o.ws && o(',') && o.ws) ||o.rws) && o.NoParenArg),
+	
+	ElseBlock: 	o=>o('do') && o.ws && o.eat('\n') && 
+				o.Statements &&
+				o.ws && o('else') && o.ws && o.eat('\n') &&
+				o.Statements &&
+				o.ws && o('end'),
+
+	If: o=>o('if') && o.rws && o.Expression && o.rws && o.group(o=>o.ElseBlock || o.DoBlock),
+
+	Assign		:o=>o.Id && o.ws && o.group(o=>o('+=')||o('-=')||o('/=')||o('*=')||o('=')) && o.ws && (o.CallNoParen || o.Expression),
+
+	Logic   :o=>o.fold(o=>o.Or),
+	Or      :o=>o.fold(o=>o.And && o.zeroOrMore(o=>o.ws && o('||') && o.ws && o.And)),
+	And     :o=>o.fold(o=>o.Cmp && o.zeroOrMore(o=>o.ws && o('&&') && o.ws && o.Cmp)),
+	Cmp     :o=>o.fold(o=>o.LogicS && o.zeroOrOne(o=>o.ws && (o('<=') || o('<') || o('>=') || o('>') || o('!=') || o('==')) && o.ws && o.LogicS)),
+	LogicS  :o=>o.fold(o=>o.CallParen || o.PrefId || o.Atom || o.AttribRef ||  o.Number || o.Boolean || o('(') && o.ws && o.Expression && o.ws && o(')')),
+
+	Math    :o=>o.fold(o=>o.Sum),
+	Sum     :o=>o.fold(o=>o.Prod && o.zeroOrMore(o=>o.ws && (o('+') || o('-')) && o.ws  && o.Prod)),
+	Prod    :o=>o.fold(o=>o.MathS && o.zeroOrMore(o=>o.ws && (o('*') || o('/')) && o.ws && o.MathS)),
+	MathS   :o=>o.fold(o=>o.CallParen || o.PrefId || o.Atom || o.AttribRef ||  o.Number || o.Boolean || o('(') && o.ws && o.Expression && o.ws && o(')'))
+
+
+	// ok so the problem is how do we recognise a call
+	//Statemnt	:o=>o.any(o=>o.Expr) && o.
+	//Expr 		:o=>o.any(o=>o.Ask)
+	//Say     	:o=>o.ws && o('say') && o.ws && o.String,
+	//Ask     	:o=>o.ws && o('ask') && o.ws && o.String,
+	//Assign		:o=>o.ws && o.Name && o.ws && o('=') && o.ws && o.Expr && o.eat('\n')
 
 	// Start   :o=>o.Form,
 	// ws      :o=>o.fold(o=>o.any(o=>o.eat(' ') || o.eat('\t'))),
@@ -45,15 +120,8 @@ var defGrammar = {
 	// Prod    :o=>o.fold(o=>o.ExprS && o.any(o=>o.ws && (o('*') || o('/')) && o.ws && o.ExprS)),
 	// ExprS   :o=>o.fold(o=>o.Id || o.Number || o('(') && o.Expr && o(')'))
 }
-
-
 // Input form
-var inputSource = 
-'Dialog main do\n' + 
-'  say "Hello"\n' +
-'  say "Brave new world"\n' +
-'  response = ask "How are you doing?"'
-'end\n'
+var inputSource = document.getElementById('file').childNodes[1].nodeValue
 
 function makeParser(rules) {
 	
@@ -65,9 +133,11 @@ function makeParser(rules) {
 			var cin = c >= a.charCodeAt(0) && c <= b.charCodeAt(0)
 			if(inv && !cin || !inv && cin) {
 				if(!eat) p.ast.value += input.charAt(p.pos)
+				if(LOG) _='[' + input.charAt(p.pos) + ']' + input.slice(p.pos + 1)
 				p.pos++
 				return true
 			}
+			if(LOG) _='!' + input.charAt(p.pos) + '!' + input.slice(p.pos + 1)
 			return false
 		}
 		var s = ''
@@ -75,10 +145,13 @@ function makeParser(rules) {
 			s += input.charAt(pos)
 			var cin = input.charCodeAt(pos) !== a.charCodeAt(i)
 			if(inv && !cin || !inv && cin) {
+				if(LOG) _='!' + s + '!' + input.slice(p.pos + s.length)
 				return false
 			}
 		}
-				if(!eat) p.ast.value += s
+		if(LOG) _='[' + s + ']' + input.slice(p.pos + s.length)
+		
+		if(!eat) p.ast.value += s
 		if(pos > p.last) p.last = pos
 		p.pos = pos
 		return true
@@ -125,20 +198,45 @@ function makeParser(rules) {
 		}
 		return true
 	})
+
+	p.__defineGetter__('rws', function() {
+		var input = p.input
+		var pos = p.pos
+		while(p.pos < input.length && (input.charCodeAt(p.pos) === 32 || input.charCodeAt(p.pos) === 9)){
+			p.pos++
+		}
+		return pos !== p.pos
+	})
 	
-	p.any = function(fn) { //zero or more
-		while(fn(p)){}
+	p.zeroOrMore = function(fn) { //zero or more
+		while(1){
+			var pos = p.pos
+			if(!fn(p)){
+				p.pos = pos
+				break
+			}
+		}
 		return true
 	}
 	
-	p.many = function(fn) { //one or more
+	p.oneOrMore = function(fn) { //one or more
 		var c = 0
-		while(fn(p)){c++}
+		while(1){
+			var pos = p.pos
+			if(!fn(p)){
+				p.pos = pos
+				break
+			}
+			c++
+		}
 		return c !== 0
 	}
 	
 	p.zeroOrOne = function(fn) { //one or more
-		fn(p)
+		var pos = p.pos
+		if(!fn(p)){
+			p.pos = pos
+		}
 		return true
 	}
 	
@@ -195,7 +293,7 @@ function makeParser(rules) {
 
 var parser = makeParser(defGrammar)
 var ast = parser.parse(inputSource)
-
+/*
 var serializeAST = {
 	indentChar:'   ',
 	indent:'',
@@ -214,6 +312,10 @@ var serializeAST = {
 		}
 		return ret
 	},
+	'Statement' : function(node){
+		var arg = node.n[0]
+		return this[arg.type](arg)
+	},
 	'Block': function(node){
 		var indent = this.indent
 		this.indent += this.indentChar
@@ -231,7 +333,7 @@ var serializeAST = {
 	'Dialog':function(node){
 		return 'Dialog ' + this.Name(node.Name) + ' ' + this.Block(node.Block)
 	}
-}
+}*/
 
 function dumpAst(node, d){
 	document.body.innerHTML += '<span>'+Array(d).join('&nbsp&nbsp&nbsp') + node.type + ':' + node.value+'</span><br/>'
@@ -241,16 +343,107 @@ function dumpAst(node, d){
 }
 document.body.innerHTML += '<span>---- AST -----</span><br/>'
 
-dumpAst(ast.n[0], 0)
+dumpAst(ast, 0)
 
 
 // lets modify the name of the dialog:
-ast.Dialog.Name.value = 'myDialog'
-
+//ast.Dialog.Name.value = 'myDialog'
+/*
 document.body.innerHTML += '<span>----- Reserialized -----<br/>'+ serializeAST.Dialog(ast.Dialog).replace(/\n/g,'<br/>').replace(/ /g,'&nbsp;')+'</span>'
-
-
-
+*/
+}
+document.addEventListener('DOMContentLoaded', run)
 </script>
+<div id='file'>
+<!--
+# Settings
+@delay 1
+@typing_indicator 1
+
+# Common Entities
+
+@yes learn(input: "yes|yep|sure", label: "Yes", return: :yes)
+@no learn(input: "no|nope|nah", label: "No", return: :no)
+
+# Common Dialogs
+
+dialog trigger: "stop|quit|end|finish" do
+  say "Ok I'll shut up now. Activate me again by saying 'hi'."
+  stop = true
+end
+
+dialog trigger: "hi|hey" do
+  say "Hi there"
+  stop = false
+end
+
+dialog trigger: "restart|again" do
+  restart = ask "Do you want to restart from the beginning?", expecting: [@yes, @no]
+  if restart == :yes do
+    invoke main
+  end
+end
+
+dialog trigger: "help" do
+  say "Some common interactions are:"
+  say "'stop' to stop, 'hi' to reactivate, 'restart' to start again"
+end
+
+dialog trigger: "French|Dutch|German" do
+  say "Sorry I only speak English"
+end
+
+# Validation
+
+@postcode learn(input: "^\d{5}(?:[-\s]\d{4})?$")
+
+dialog validate_postcode do
+  say "Sorry, that doesn't look like a postcode. Should be something like 10001"
+end
+
+# Built in special cases
+
+dialog __returning__ do
+  random do
+    say "Where were we..."
+    say "Back the to subject..."
+    say "Shall we..."
+    say "Ok..."
+    say "So..."
+  end
+end
+
+dialog __unknown_location__ do
+  say "Thanks for your location. Will keep it in mind next time I visit."
+end
+
+dialog __unknown__ do
+  random do
+    say "Sorry I don't understand"
+    say "Sorry I am just a chatbot"
+  end
+  say "Type 'help' to get help on my capabilities "
+end
+
+@thumb_up 369239263222822
+
+dialog(attachment: :image) do
+  if attachment.metadata.sticker_id do
+    if attachment.metadata.sticker_id == @thumb_up do
+      say "👍"
+    else
+      say "Cool sticker!"
+    end
+  else
+    say "Thanks for the photo!"
+  end
+end
+
+dialog __timeout__ do
+  emit "bye bye #{user.user_id}"  # emits to a backchannel
+end
+-->
+</div>
+
 </body>
 </html>
