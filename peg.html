@@ -25,12 +25,7 @@ window.__defineSetter__('_', function(arg){
 
 // GRAMMAR
 var defGrammar = {
-	Start   	:o=>o.zeroOrMore(o=>o.ws && o('\n')) && o.zeroOrMore(o=>o.Attribute || o.Statement),
-
-	// optimized out:
-	//Id	    :o=>o.not(o=>o('do') || o('end') || o('if')) && (o('a', 'z') || o('A', 'Z') || o('_')) && o.zeroOrMore(o=>o('a', 'z') || o('A', 'Z') || o('0', '9') || o('_')),
-	//String  	:o=>o('"') && o.zeroOrMore(o=>o.inv('"')) && o('"'),
-	
+	Start   	:o=>o.zeroOrMore(o=>o.ws && o('\n')) && o.zeroOrMore(o=>o.Attribute || o.Statement),	
 	IdChain     :o=>o.fold(o=>o.Id && o.zeroOrMore(o=>o('.') && o.Id)),
 
 	PrefId      :o=>o.empty(o=>o.zeroOrOne(o=>o('!')||o('-')||o('+')) && o.ws && o.IdChain, 1),
@@ -82,9 +77,85 @@ var defGrammar = {
 	Math    :o=>o.fold(o=>o.Sum),
 	Sum     :o=>o.fold(o=>o.Prod && o.zeroOrMore(o=>o.ws && (o('+') || o('-')) && o.ws  && o.Prod)),
 	Prod    :o=>o.fold(o=>o.MathS && o.zeroOrMore(o=>o.ws && (o('*') || o('/')) && o.ws && o.MathS)),
-	MathS   :o=>o.fold(o=>o.ExprAtom || o('(') && o.ws && o.Expression && o.ws && o(')'))
+	MathS   :o=>o.fold(o=>o.ExprAtom || o('(') && o.ws && o.Expression && o.ws && o(')')),
 
+	// optimized out:
+	//Id	    :o=>o.not(o=>o('do') || o('end') || o('if')) && (o('a', 'z') || o('A', 'Z') || o('_')) && o.zeroOrMore(o=>o('a', 'z') || o('A', 'Z') || o('0', '9') || o('_')),
+	//String  	:o=>o('"') && o.zeroOrMore(o=>o.inv('"')) && o('"'),
+
+	// optimized getters
+	_ws     :function() {
+		var o = this
+		var input = o.input
+		while(o.pos < input.length && (input.charCodeAt(o.pos) === 32 || input.charCodeAt(o.pos) === 9)){
+			o.pos++
+		}
+		return true
+	},
+	_rws     :function() {
+		var o = this
+		var input = o.input
+		var pos = o.pos
+		while(o.pos < input.length && (input.charCodeAt(o.pos) === 32 || input.charCodeAt(o.pos) === 9)){
+			o.pos++
+		}
+		return pos !== o.pos
+	},
+	_Id      :function() {
+		var o = this
+		var input = o.input
+		var pos = o.pos
+		var c1 = input.charCodeAt(o.pos)
+
+		// check for do end or if
+		var c2 = input.charCodeAt(o.pos+1)
+		var c3 = input.charCodeAt(o.pos+2)
+		if(c1 == 100 && c2 == 111)  return false // do
+		if(c1 == 105 && c2 == 102) return false //if
+		if(c1 == 101 && c2 == 110 && c3 == 100) return false // end
+
+		if(c1 >= 65 && c1 <=90 || c1 >= 97 && c1 <= 122 || c1 == 95){
+			o.pos++
+			while(o.pos < input.length){
+				c1 = input.charCodeAt(++o.pos)
+				if(!(c1 >=48 && c1 <= 57 || c1 >= 65 && c1 <=90 || c1 >= 97 && c1 <= 122 || c1 == 95)){
+					// make a node and add it.
+					o.ast.n.push({
+						type:'Id',
+						n:[],
+						value:input.slice(pos, o.pos), 
+						start:pos, end:o.pos
+					})
+					break
+				}
+			}
+		}
+		return pos !== o.pos
+	},
+	_String   :function() {
+		var o = this
+		var input = o.input
+		var pos = o.pos
+		var ch = input.charCodeAt(o.pos)
+		if(ch == 34){
+			while(o.pos < input.length){
+				ch = input.charCodeAt(++o.pos)
+				if(ch === 34){
+					o.pos++
+					o.ast.n.push({
+						type:'String',
+						n:[],
+						value:input.slice(pos, o.pos), 
+						start:pos, end:o.pos
+					})
+					return true
+				}
+			}
+		}
+		return false
+	}
 }
+
 // Input form
 var inputSource = document.getElementById('file').childNodes[1].nodeValue
 
@@ -157,75 +228,7 @@ function makeParser(rules) {
 		}
 		return false
 	}
-	p.__defineGetter__('ws', function() {
-		var input = p.input
-		while(p.pos < input.length && (input.charCodeAt(p.pos) === 32 || input.charCodeAt(p.pos) === 9)){
-			p.pos++
-		}
-		return true
-	})
 
-	p.__defineGetter__('rws', function() {
-		var input = p.input
-		var pos = p.pos
-		while(p.pos < input.length && (input.charCodeAt(p.pos) === 32 || input.charCodeAt(p.pos) === 9)){
-			p.pos++
-		}
-		return pos !== p.pos
-	})
-	
-	p.__defineGetter__('Id', function() {
-		var input = p.input
-		var pos = p.pos
-		var c1 = input.charCodeAt(p.pos)
-
-		// check for do end or if
-		var c2 = input.charCodeAt(p.pos+1)
-		var c3 = input.charCodeAt(p.pos+2)
-		if(c1 == 100 && c2 == 111)  return false // do
-		if(c1 == 105 && c2 == 102) return false //if
-		if(c1 == 101 && c2 == 110 && c3 == 100) return false // end
-
-		if(c1 >= 65 && c1 <=90 || c1 >= 97 && c1 <= 122 || c1 == 95){
-			p.pos++
-			while(p.pos < input.length){
-				c1 = input.charCodeAt(++p.pos)
-				if(!(c1 >=48 && c1 <= 57 || c1 >= 65 && c1 <=90 || c1 >= 97 && c1 <= 122 || c1 == 95)){
-					// make a node and add it.
-					p.ast.n.push({
-						type:'Id',
-						n:[],
-						value:input.slice(pos, p.pos), 
-						start:pos, end:p.pos
-					})
-					break
-				}
-			}
-		}
-		return pos !== p.pos
-	})
-
-	p.__defineGetter__('String', function() {
-		var input = p.input
-		var pos = p.pos
-		var ch = input.charCodeAt(p.pos)
-		if(ch == 34){
-			while(p.pos < input.length){
-				ch = input.charCodeAt(++p.pos)
-				if(ch === 34){
-					p.pos++
-					p.ast.n.push({
-						type:'String',
-						n:[],
-						value:input.slice(pos, p.pos), 
-						start:pos, end:p.pos
-					})
-					return true
-				}
-			}
-		}
-		return false
-	})
 
 	p.zeroOrMore = function(fn) { //zero or more
 		while(1){
@@ -278,7 +281,10 @@ function makeParser(rules) {
 	}
 
 	for(var key in rules){
-		p.__defineGetter__(key, function(key) {
+		if(key.charAt(0) === '_'){
+			p.__defineGetter__(key.slice(1), rules[key])
+		}
+		else p.__defineGetter__(key, function(key) {
 			
 			var pos = p.pos
 
