@@ -49,8 +49,8 @@ var defGrammar = {
 	
 	Attribute	:o=>o('@') && o.Id && o.rws && o.Expression && o.oneOrMore(o=>o.ws && o.eat('\n')),
 	
-	Expression  :o=>o.CallParen || o.If || o.DoBlock || o.List || o.String || o.Assign || o.Logic|| o.Math || o.Atom || o.AttribRef || o.Number || o.PrefId|| o.Boolean,
-
+	Expression  :o=>o.Assign || o.Logic || o.Math || o.ExprAtom,
+	ExprAtom    :o=>o.fold(o=>o.CallParen || o.If || o.DoBlock || o.List || o.String || o.Atom || o.AttribRef || o.Number || o.PrefId|| o.Boolean),
 	List 		:o=>o('[') && o.ws && o.zeroOrOne(o=>o.Expression) && o.zeroOrMore(o=>o.ws && o(',') && o.ws && o.Expression) && o.ws && o(']'),
 
 	Label       :o=>o.Id && o(':'),
@@ -77,13 +77,55 @@ var defGrammar = {
 	Or      :o=>o.fold(o=>o.And && o.zeroOrMore(o=>o.ws && o('||') && o.ws && o.And)),
 	And     :o=>o.fold(o=>o.Cmp && o.zeroOrMore(o=>o.ws && o('&&') && o.ws && o.Cmp)),
 	Cmp     :o=>o.fold(o=>o.LogicS && o.zeroOrOne(o=>o.ws && (o('<=') || o('<') || o('>=') || o('>') || o('!=') || o('==')) && o.ws && o.LogicS)),
-	LogicS  :o=>o.fold(o=>o.CallParen || o.PrefId || o.Atom || o.AttribRef ||  o.Number || o.Boolean || o('(') && o.ws && o.Expression && o.ws && o(')')),
+	LogicS  :o=>o.fold(o=>o.ExprAtom || o('(') && o.ws && o.Expression && o.ws && o(')')),
 
 	Math    :o=>o.fold(o=>o.Sum),
 	Sum     :o=>o.fold(o=>o.Prod && o.zeroOrMore(o=>o.ws && (o('+') || o('-')) && o.ws  && o.Prod)),
 	Prod    :o=>o.fold(o=>o.MathS && o.zeroOrMore(o=>o.ws && (o('*') || o('/')) && o.ws && o.MathS)),
-	MathS   :o=>o.fold(o=>o.CallParen || o.PrefId || o.Atom || o.AttribRef ||  o.Number || o.Boolean || o('(') && o.ws && o.Expression && o.ws && o(')'))
+	MathS   :o=>o.fold(o=>o.ExprAtom || o('(') && o.ws && o.Expression && o.ws && o(')')),
 
+	// optimized rules
+	Id      :function(p) {
+		var input = p.input
+		var pos = p.pos
+		var c1 = input.charCodeAt(p.pos)
+
+		// check for do end or if
+		var c2 = input.charCodeAt(p.pos+1)
+		var c3 = input.charCodeAt(p.pos+2)
+		if(c1 == 100 && c2 == 111)  return false // do
+		if(c1 == 105 && c2 == 102) return false //if
+		if(c1 == 101 && c2 == 110 && c3 == 100) return false // end
+
+		if(c1 >= 65 && c1 <=90 || c1 >= 97 && c1 <= 122 || c1 == 95){
+			p.pos++
+			while(p.pos < input.length){
+				c1 = input.charCodeAt(++p.pos)
+				if(!(c1 >=48 && c1 <= 57 || c1 >= 65 && c1 <=90 || c1 >= 97 && c1 <= 122 || c1 == 95)){
+					p.ast.value += input.slice(pos, p.pos)
+					break
+				}
+			}
+		}
+		return pos !== p.pos
+	},
+
+	String  :function(p) {
+		var input = p.input
+		var pos = p.pos
+		var ch = input.charCodeAt(p.pos)
+		if(ch == 34){
+			while(p.pos < input.length){
+				ch = input.charCodeAt(++p.pos)
+				if(ch === 34){
+					p.pos++
+					p.ast.value += input.slice(pos, p.pos)
+					break
+				}
+			}
+		}
+		return pos !== p.pos
+	}
 }
 // Input form
 var inputSource = document.getElementById('file').childNodes[1].nodeValue
@@ -174,46 +216,6 @@ function makeParser(rules) {
 		return pos !== p.pos
 	})
 	
-	p.__defineGetter__('Id', function() {
-		var input = p.input
-		var pos = p.pos
-		var c1 = input.charCodeAt(p.pos)
-
-		// check for do end or if
-		var c2 = input.charCodeAt(p.pos+1)
-		var c3 = input.charCodeAt(p.pos+2)
-		if(c1 == 100 && c2 == 111)  return false // do
-		if(c1 == 105 && c2 == 102) return false //if
-		if(c1 == 101 && c2 == 110 && c3 == 100) return false // end
-
-		if(c1 >= 65 && c1 <=90 || c1 >= 97 && c1 <= 122 || c1 == 95){
-			p.pos++
-			while(p.pos < input.length){
-				c1 = input.charCodeAt(++p.pos)
-				if(!(c1 >=48 && c1 <= 57 || c1 >= 65 && c1 <=90 || c1 >= 97 && c1 <= 122 || c1 == 95)){
-					break
-				}
-			}
-		}
-		return pos !== p.pos
-	})
-
-	p.__defineGetter__('String', function() {
-		var input = p.input
-		var pos = p.pos
-		var ch = input.charCodeAt(p.pos)
-		if(ch == 34){
-			while(p.pos < input.length){
-				ch = input.charCodeAt(++p.pos)
-				if(ch === 34){
-					p.pos++
-					break
-				}
-			}
-		}
-		return pos !== p.pos
-	})
-
 	p.zeroOrMore = function(fn) { //zero or more
 		while(1){
 			var pos = p.pos
