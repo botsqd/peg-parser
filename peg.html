@@ -5,28 +5,11 @@
 function run(){
 
 var LOG = 0
-Error.stackTraceLimit=50
-window.__defineSetter__('_', function(arg){
-	var stack = new Error().stack || ''
-	// lets collect the stack
-	var st = stack.split('\n')
-	var str = ''
-	for(var i = 0; i < st.length; i++){
-		var m = st[i].match(/at (\w+)/)
-		if(m){
-			if(defGrammar[m[1]]){
-				if(str) str += '<'
-				str += m[1]
-			}
-		}
-	}
-	console.log(str + ': '+arg.replace(/\n/g, '\\n'))
-})
 
 // GRAMMAR
 var defGrammar = {
 	Start   	:o=>o.zeroOrMore(o=>o.ws && o('\n')) && o.zeroOrMore(o=>o.Attribute || o.Statement),	
-	IdChain     :o=>o.fold(o=>o.Id && o.zeroOrMore(o=>o('.') && o.Id)),
+	IdChain     :o=>o.fold(o=>o.NotKeyword && o.Id && o.zeroOrMore(o=>o('.') && o.Id)),
 
 	PrefId      :o=>o.empty(o=>o.zeroOrOne(o=>o('!')||o('-')||o('+')) && o.ws && o.IdChain, 1),
 
@@ -101,18 +84,28 @@ var defGrammar = {
 		}
 		return pos !== o.pos
 	},
+	_NotKeyword : function(){
+		var o = this
+		var input = o.input
+		var pos = o.pos
+		var c1 = input.charCodeAt(o.pos)
+		var c2 = input.charCodeAt(o.pos+1)
+		var c3 = input.charCodeAt(o.pos+2)
+		var c4 = input.charCodeAt(o.pos+3)
+		var c5 = input.charCodeAt(o.pos+4)
+		if(c1 == 100 && c2 == 111)  return false // do
+		if(c1 == 105 && c2 == 102) return false //if
+		if(c1 == 101 && c2 == 110 && c3 == 100) return false // end
+		//if(c1 == 101 && c2 == 110 && c3 == 100) return false // else
+		//if(c1 == 101 && c2 == 110 && c3 == 100) return false // true
+		//if(c1 == 101 && c2 == 110 && c3 == 100) return false // false
+		return true
+	},
 	_Id      :function() {
 		var o = this
 		var input = o.input
 		var pos = o.pos
 		var c1 = input.charCodeAt(o.pos)
-
-		// check for do end or if
-		var c2 = input.charCodeAt(o.pos+1)
-		var c3 = input.charCodeAt(o.pos+2)
-		if(c1 == 100 && c2 == 111)  return false // do
-		if(c1 == 105 && c2 == 102) return false //if
-		if(c1 == 101 && c2 == 110 && c3 == 100) return false // end
 
 		if(c1 >= 65 && c1 <=90 || c1 >= 97 && c1 <= 122 || c1 == 95){
 			o.pos++
@@ -333,11 +326,27 @@ function makeParser(rules) {
 	
 	return p
 }
-
+Error.stackTraceLimit=50
+window.__defineSetter__('_', function(arg){
+	var stack = new Error().stack || ''
+	// lets collect the stack
+	var st = stack.split('\n')
+	var str = ''
+	for(var i = 0; i < st.length; i++){
+		var m = st[i].match(/at (\w+)/)
+		if(m){
+			if(defGrammar[m[1]]){
+				if(str) str += '<'
+				str += m[1]
+			}
+		}
+	}
+	console.log(str + ': '+arg.replace(/\n/g, '\\n'))
+})
 
 var parser = makeParser(defGrammar)
 var dt = Date.now()
-var bench = false
+var bench = true
 if(bench){
 	var dt = Date.now()
 	for(var i = 0; i <100; i++){
