@@ -258,17 +258,39 @@ function makeParser(rules) {
 		return ret
 	}
 	
+	p.memoize = {}
+
 	for(var key in rules){
 		p.__defineGetter__(key, function(key) {
+			
+			var pos = p.pos
+
 			var rule = rules[key]
 			var parent = p.ast
-			var mine = p.ast = {type:key, n:[], value:'', start:pos}
-			var pos = p.pos
+			// lets check our memoize fn 
+			
+			// if we do the same item at the same spot, return it
+
 			p.stack.push(key)
-			var ret = rule(p)
+
+			var memo = p.memoize[pos]
+			var mine = memo && memo[key]
+			var ret
+			if(!mine){
+				mine = p.ast = {type:key, n:[], value:'', start:pos}
+				ret = rule(p)
+			}
+			else{
+				p.pos = mine.end
+				ret = true
+			}
+
 			p.ast = parent
+
 			if(ret === true) {
-				mine.end = pos
+				var memo = p.memoize[mine.start] || (p.memoize[mine.start] = {})
+				memo[key] = mine
+				mine.end = p.pos
 				parent.n.push(mine)
 				parent[key] = mine
 				p.stack.pop()
