@@ -8,35 +8,39 @@ var LOG = 0
 
 // GRAMMAR
 var defGrammar = {
-	Start   	:o=>o.zeroOrMore(o=>o.ws && o('\n')) && o.zeroOrMore(o=>o.Attribute || o.Statement),	
+	Start   	:o=>o.zeroOrMore(o=>o.ws && o('\n')) && o.zeroOrMore(o=>o.Attribute || o.Statement || o.CommentLine),	
 	IdChain     :o=>o.fold(o=>o.NotKeyword && o.Id && o.zeroOrMore(o=>o('.') && o.Id)),
 
 	PrefId      :o=>o.empty(o=>o.zeroOrOne(o=>o('!')||o('-')||o('+')) && o.ws && o.IdChain, 1),
 
 	Number      :o=>(o.zeroOrOne(o=>o('-')) && o.oneOrMore(o=>o('0', '9')) && o.zeroOrOne(o=>o('.') && o.oneOrMore(o=>o('0', '9')))),
 	Boolean     :o=>o('true') || o('false'),
-	DoBlock		:o=>o('do') && o.ws && o.eat('\n') && 
-				o.Statements &&
-				o.ws && o('end'),
 
-	Statements  :o=>o.zeroOrMore(o=>o.ws && o('\n')) && o.zeroOrMore(o=>o.not(o=>o('end') || o('else')) && o.Statement),
+	DoLine      :o=>o('do:') && o.Statement,
+
+	DoBlock		:o=>o('do') && o.ws && o.eat('\n') && o.Statements && o.ws && o('end'),
+
+	Statements  :o=>o.zeroOrMore(o=>o.ws && o('\n')) && o.zeroOrMore(o=>o.not(o=>o.eat('end') || o.eat('else')) && (o.Statement || o.CommentLine)),
 
 	Comment     :o=>o('#') && o.zeroOrMore(o=>o.inv('\n')),
+	CommentLine :o=>o.ws && o.eat('\n') || o('#') && o.zeroOrMore(o=>o.inv('\n')) && o.eat('\n'),
 
-	Statement	:o=>o.ws && o.group(o=>o.CallNoParen || o.Expression || o.Comment) && o.oneOrMore(o=>o.zeroOrMore(o=>o.ws && o.Comment) && o.ws && o.eat('\n')),
+	Arrow       :o=>(o.ws && o.Expression && o.ws && o('->') && o.zeroOrMore(o=>o.ws && o('\n') && o.ws) && (o.CallNoParen || o.Expression)),
+
+	Statement	:o=>o.ws && o.group(o=>o.Arrow || o.CallNoParen || o.Expression || o.Comment) && o.zeroOrMore(o=>o.ws && o.Comment) && o.ws && o.eat('\n'),
 	
 	Attribute	:o=>o('@') && o.Id && o.rws && o.Expression && o.oneOrMore(o=>o.ws && o.eat('\n')),
 	
-	Expression  :o=>o.Assign || o.Logic || o.Math || o.ExprAtom,
-	ExprAtom    :o=>o.fold(o=>o.CallParen || o.If || o.DoBlock || o.List || o.String || o.Atom || o.AttribRef || o.Number|| o.Boolean || o.PrefId),
+	Expression  :o=>o.Assign || o.Logic || o.Math || o.ExprItem,
+	ExprItem    :o=>o.fold(o=>o.CallParen || o.If || o.DoLine || o.DoBlock  || o.List || o.String || o.Atom || o.AttribRef || o.Number|| o.Boolean || o.PrefId),
 	List 		:o=>o('[') && o.ws && o.zeroOrOne(o=>o.Expression) && o.zeroOrMore(o=>o.ws && o(',') && o.ws && o.Expression) && o.ws && o(']'),
 
-	Label       :o=>o.Id && o(':'),
+	Label       :o=>o.NotKeyword && o.Id && o(':'),
 	Atom        :o=>o(':') && o.Id,
 	AttribRef   :o=>o('@') && o.Id,
 
 	ParenArg    :o=>o.zeroOrOne(o=>o.Label && o.ws) && o.Expression,
-	CallParen   :o=>o.IdChain && o.ws && o('(') && o.ws && o.zeroOrOne(o=>o.ParenArg) && o.zeroOrMore(o=>o.ws && o(',') && o.ws && o.ParenArg) && o.ws && o(')') && o.zeroOrOne(o=>o.ws && o.DoBlock),
+	CallParen   :o=>o.IdChain && o.ws && o('(') && o.ws && o.zeroOrOne(o=>o.ParenArg) && o.zeroOrMore(o=>o.ws && o(',') && o.ws && o.ParenArg) && o.ws && o(')') && o.zeroOrOne(o=>o.ws && (o.DoLine || o.DoBlock )),
 
 	NoParenArg  :o=>o.zeroOrOne(o=>o.Label && o.ws) && o.Expression,
 	CallNoParen	:o=>o.IdChain && o.rws && o.NoParenArg && o.zeroOrMore(o=>( o.group(o=>o.ws && o(',') && o.ws) ||o.rws) && o.NoParenArg),
@@ -47,20 +51,20 @@ var defGrammar = {
 				o.Statements &&
 				o.ws && o('end'),
 
-	If: o=>o('if') && o.rws && o.Expression && o.rws && o.group(o=>o.ElseBlock || o.DoBlock),
+	If: o=>o('if') && o.rws && o.Expression && o.rws && (o.ElseBlock || o.DoLine || o.DoBlock ),
 
 	Assign		:o=>o.Id && o.ws && o.group(o=>o('+=')||o('-=')||o('/=')||o('*=')||o('=')) && o.ws && (o.CallNoParen || o.Expression),
 
-	Logic   :o=>o.fold(o=>o.Or),
+	Logic   :o=>o.foldTwo(o=>o.Or),
 	Or      :o=>o.fold(o=>o.And && o.zeroOrMore(o=>o.ws && o('||') && o.ws && o.And)),
 	And     :o=>o.fold(o=>o.Cmp && o.zeroOrMore(o=>o.ws && o('&&') && o.ws && o.Cmp)),
 	Cmp     :o=>o.fold(o=>o.LogicS && o.zeroOrOne(o=>o.ws && (o('<=') || o('<') || o('>=') || o('>') || o('!=') || o('==')) && o.ws && o.LogicS)),
-	LogicS  :o=>o.fold(o=>o.ExprAtom || o('(') && o.ws && o.Expression && o.ws && o(')')),
+	LogicS  :o=>o.fold(o=>o.ExprItem || o('(') && o.ws && o.Expression && o.ws && o(')')),
 
-	Math    :o=>o.fold(o=>o.Sum),
+	Math    :o=>o.foldTwo(o=>o.Sum),
 	Sum     :o=>o.fold(o=>o.Prod && o.zeroOrMore(o=>o.ws && (o('+') || o('-')) && o.ws  && o.Prod)),
 	Prod    :o=>o.fold(o=>o.MathS && o.zeroOrMore(o=>o.ws && (o('*') || o('/')) && o.ws && o.MathS)),
-	MathS   :o=>o.fold(o=>o.ExprAtom || o('(') && o.ws && o.Expression && o.ws && o(')')),
+	MathS   :o=>o.fold(o=>o.ExprItem || o('(') && o.ws && o.Expression && o.ws && o(')')),
 
 	// optimized out:
 	//Id	    :o=>o.not(o=>o('do') || o('end') || o('if')) && (o('a', 'z') || o('A', 'Z') || o('_')) && o.zeroOrMore(o=>o('a', 'z') || o('A', 'Z') || o('0', '9') || o('_')),
@@ -70,7 +74,9 @@ var defGrammar = {
 	_ws     :function() {
 		var o = this
 		var input = o.input
-		while(o.pos < input.length && (input.charCodeAt(o.pos) === 32 || input.charCodeAt(o.pos) === 9)){
+		while(o.pos < input.length){
+			var ch = input.charCodeAt(o.pos)
+			if(ch !== 32 && ch !== 9) break
 			o.pos++
 		}
 		return true
@@ -79,7 +85,9 @@ var defGrammar = {
 		var o = this
 		var input = o.input
 		var pos = o.pos
-		while(o.pos < input.length && (input.charCodeAt(o.pos) === 32 || input.charCodeAt(o.pos) === 9)){
+		while(o.pos < input.length){
+			var ch = input.charCodeAt(o.pos)
+			if(ch !== 32 && ch !== 9) break
 			o.pos++
 		}
 		return pos !== o.pos
@@ -108,17 +116,16 @@ var defGrammar = {
 		var c1 = input.charCodeAt(o.pos)
 
 		if(c1 >= 65 && c1 <=90 || c1 >= 97 && c1 <= 122 || c1 == 95){
-			o.pos++
 			while(o.pos < input.length){
 				c1 = input.charCodeAt(++o.pos)
 				if(!(c1 >=48 && c1 <= 57 || c1 >= 65 && c1 <=90 || c1 >= 97 && c1 <= 122 || c1 == 95)){
 					// make a node and add it.
 					o.ast.n.push({
 						type:'Id',
-						n:[],
 						value:input.slice(pos, o.pos), 
 						start:pos, end:o.pos
 					})
+					if(LOG) _='Id:[' + input.slice(pos, o.pos) + ']' + input.slice(o.pos + 1)
 					break
 				}
 			}
@@ -137,10 +144,10 @@ var defGrammar = {
 					o.pos++
 					o.ast.n.push({
 						type:'String',
-						n:[],
 						value:input.slice(pos, o.pos), 
 						start:pos, end:o.pos
 					})
+					if(LOG) _='String:[' + input.slice(pos, o.pos) + ']' + input.slice(o.pos + 1)
 					return true
 				}
 			}
@@ -174,7 +181,7 @@ function makeParser(rules) {
 			s += input.charAt(pos)
 			var cin = input.charCodeAt(pos) !== a.charCodeAt(i)
 			if(inv && !cin || !inv && cin) {
-				if(LOG) _='!' + s + '!' + input.slice(p.pos + s.length)
+				if(LOG) _='!' + s + '!' + '('+a+')'+input.slice(p.pos + s.length)
 				return false
 			}
 		}
@@ -185,7 +192,10 @@ function makeParser(rules) {
 		p.pos = pos
 		return true
 	}
-	
+	p.__defineSetter__('trace', function(value){
+		console.log('TRACE',value)
+		//debugger
+	})
 	p.eat = function(a, b) {
 		return p(a, b, true)
 	}
@@ -213,7 +223,22 @@ function makeParser(rules) {
 		}
 		return false
 	}
-	
+
+	p.foldTwo = function(fn) {
+		if(fn(p)) {
+			var len = p.ast.n.length
+			if(len < 2){
+				if(len === 1){
+					var n2 = p.ast.n[0].n
+					if(!n2 || n2.length < 2) return false
+				}
+				return 0
+			}
+			return true
+		}
+		return false
+	}
+
 	p.empty = function(fn) {
 		if(fn(p)) {
 			if(p.ast.value.length == 0) return 0
@@ -326,7 +351,7 @@ function makeParser(rules) {
 	
 	return p
 }
-Error.stackTraceLimit=50
+Error.stackTraceLimit=150
 window.__defineSetter__('_', function(arg){
 	var stack = new Error().stack || ''
 	// lets collect the stack
@@ -336,8 +361,7 @@ window.__defineSetter__('_', function(arg){
 		var m = st[i].match(/at (\w+)/)
 		if(m){
 			if(defGrammar[m[1]]){
-				if(str) str += '<'
-				str += m[1]
+				str = m[1] + '>' + str
 			}
 		}
 	}
@@ -346,7 +370,7 @@ window.__defineSetter__('_', function(arg){
 
 var parser = makeParser(defGrammar)
 var dt = Date.now()
-var bench = true
+var bench = false
 if(bench){
 	var dt = Date.now()
 	for(var i = 0; i <100; i++){
@@ -399,15 +423,16 @@ var serializeAST = {
 	}
 }*/
 
+var out = ''
 function dumpAst(node, d){
-	document.body.innerHTML += '<span>'+Array(d).join('&nbsp&nbsp&nbsp') + node.type + ':' + node.value+'</span><br/>'
-	for(let i = 0;i < node.n.length;i++){
+	out += '<span>'+Array(d).join('&nbsp&nbsp&nbsp') + node.type + ':' + node.value+'</span><br/>'
+	if(node.n) for(let i = 0;i < node.n.length;i++){
 		dumpAst(node.n[i], d + 1)
 	}
 }
-document.body.innerHTML += '<span>---- AST -----</span><br/>'
-
+out += '<span>---- AST -----</span><br/>'
 dumpAst(ast, 0)
+document.body.innerHTML = out
 
 
 // lets modify the name of the dialog:
@@ -418,6 +443,15 @@ document.body.innerHTML += '<span>----- Reserialized -----<br/>'+ serializeAST.D
 }
 document.addEventListener('DOMContentLoaded', run)
 </script>
+<div id='file2'>
+<!--
+
+if a == c do
+
+end
+
+-->
+</div>
 <div id='file'>
 <!--
 import "main"
@@ -460,7 +494,6 @@ dialog express do
   foo = 1
   remember foo
   forget foo
-
 end
 
 dialog logic do
