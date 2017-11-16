@@ -420,7 +420,11 @@ document.addEventListener('DOMContentLoaded', run)
 </script>
 <div id='file'>
 <!--
+import "main"
+import "helpers"
+
 # Settings
+
 @delay 1
 @typing_indicator 1
 
@@ -430,6 +434,91 @@ document.addEventListener('DOMContentLoaded', run)
 @no learn(input: "no|nope|nah", label: "No", return: :no)
 
 # Common Dialogs
+
+dialog main do
+  location = ask "Please share your location", expecting: :location
+  think 1.5
+  laugh = ask "Did you laugh?", quick_replies: ["Yes", "No"], help_dialog: oops
+  sleep 2 * 2
+  image "https://www.domain.com/image.jpg"
+  location [4.893414, 52.364909]
+end
+
+dialog button do
+  buttons "What do you want to do next?" do
+    "Open CNN" ->
+      open "http://cnn.com"
+    "Postback hi" ->
+      postback "hi"
+  end
+end
+
+# special for of blocks with only one statement. shows that blocks are just last parameter to functions in Elixir
+dialog shortblock, do: say "hello"
+
+dialog express do
+  foo = 1
+  remember foo
+  forget foo
+
+end
+
+dialog logic do
+  say "Let try out some logical thinking"
+  
+  say "156 + 234 ="
+  say 156 + 234
+  
+  say "12 > 2 ?"
+  say 12 > 2
+  
+  a = 1
+  b = "1"
+  c = 1.0
+  d = "one"
+  
+  if a == b do
+    say "1 is '1'"
+  else
+    say "1 is not '1'"
+  end
+  
+  if a == c do
+    say "1 is 1.0"
+  else
+    say "1 is not 1.0"
+  end
+  
+  if a != d do
+    say "1 is not one"
+  else
+    say "1 is one"
+  end
+  
+  if a == c || a == d do
+    say "Either 1 is 1.0 OR 1 is one"
+  end
+  
+  if a == c && a == d do
+    say "1 is 1.0 AND 1 is one"
+  else
+    say "Nope (1 is 1.0) AND (1 is one) are not both true"
+  end
+  
+  # you can nest if else blocks for more fine grained "thinking"
+  if a == c do
+    say "1 is 1.0"
+    if a == d do
+      say "1 is one"
+    else
+      say "but 1 is not one"
+    end
+  else
+    say "but 1 is not 1.0"
+  end
+  
+  say "finished"
+end
 
 dialog trigger: "stop|quit|end|finish" do
   say "Ok I'll shut up now. Activate me again by saying 'hi'."
