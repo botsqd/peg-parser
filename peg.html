@@ -27,7 +27,7 @@ window.__defineSetter__('_', function(arg){
 var defGrammar = {
 	Start   	:o=>o.zeroOrMore(o=>o.ws && o('\n')) && o.zeroOrMore(o=>o.Attribute || o.Statement),
 
-	Id		    :o=>o.not(o=>o('do') || o('end') || o('if')) && (o('a', 'z') || o('A', 'Z') || o('_')) && o.zeroOrMore(o=>o('a', 'z') || o('A', 'Z') || o('0', '9') || o('_')),
+	//Id2		    :o=>o.not(o=>o('do') || o('end') || o('if')) && (o('a', 'z') || o('A', 'Z') || o('_')) && o.zeroOrMore(o=>o('a', 'z') || o('A', 'Z') || o('0', '9') || o('_')),
 	
 	IdChain     :o=>o.fold(o=>o.Id && o.zeroOrMore(o=>o('.') && o.Id)),
 
@@ -39,7 +39,7 @@ var defGrammar = {
 				o.Statements &&
 				o.ws && o('end'),
 
-	String  	:o=>o('"') && o.zeroOrMore(o=>o.inv('"')) && o('"'),
+	//String  	:o=>o('"') && o.zeroOrMore(o=>o.inv('"')) && o('"'),
 
 	Statements  :o=>o.zeroOrMore(o=>o.ws && o('\n')) && o.zeroOrMore(o=>o.not(o=>o('end') || o('else')) && o.Statement),
 
@@ -174,6 +174,38 @@ function makeParser(rules) {
 		return pos !== p.pos
 	})
 	
+	p.__defineGetter__('Id', function() {
+		var input = p.input
+		var pos = p.pos
+		var ch = input.charCodeAt(p.pos)
+		if(ch >= 65 && ch <=90 || ch >= 97 && ch <= 122 || ch == 95){
+			p.pos++
+			while(p.pos < input.length){
+				ch = input.charCodeAt(++p.pos)
+				if(!(ch >=48 && ch <= 57 || ch >= 65 && ch <=90 || ch >= 97 && ch <= 122 || ch == 95)){
+					break
+				}
+			}
+		}
+		return pos !== p.pos
+	})
+
+	p.__defineGetter__('String', function() {
+		var input = p.input
+		var pos = p.pos
+		var ch = input.charCodeAt(p.pos)
+		if(ch == 34){
+			while(p.pos < input.length){
+				ch = input.charCodeAt(++p.pos)
+				if(ch === 34){
+					p.pos++
+					break
+				}
+			}
+		}
+		return pos !== p.pos
+	})
+
 	p.zeroOrMore = function(fn) { //zero or more
 		while(1){
 			var pos = p.pos
@@ -223,8 +255,6 @@ function makeParser(rules) {
 		if(!ret) p.pos = pos
 		return ret
 	}
-	
-	
 
 	for(var key in rules){
 		p.__defineGetter__(key, function(key) {
@@ -280,7 +310,18 @@ function makeParser(rules) {
 
 
 var parser = makeParser(defGrammar)
+var dt = Date.now()
+var bench = false
+if(bench){
+	var dt = Date.now()
+	for(var i = 0; i <100; i++){
+		var ast = parser.parse(inputSource)
+	}
+	console.log("Performance per parse: "+((Date.now()-dt)/100)+"ms")
+}
+
 var ast = parser.parse(inputSource)
+
 /*
 var serializeAST = {
 	indentChar:'   ',
