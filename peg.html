@@ -27,7 +27,9 @@ window.__defineSetter__('_', function(arg){
 var defGrammar = {
 	Start   	:o=>o.zeroOrMore(o=>o.ws && o('\n')) && o.zeroOrMore(o=>o.Attribute || o.Statement),
 
-	//Id2		    :o=>o.not(o=>o('do') || o('end') || o('if')) && (o('a', 'z') || o('A', 'Z') || o('_')) && o.zeroOrMore(o=>o('a', 'z') || o('A', 'Z') || o('0', '9') || o('_')),
+	// optimized out:
+	//Id	    :o=>o.not(o=>o('do') || o('end') || o('if')) && (o('a', 'z') || o('A', 'Z') || o('_')) && o.zeroOrMore(o=>o('a', 'z') || o('A', 'Z') || o('0', '9') || o('_')),
+	//String  	:o=>o('"') && o.zeroOrMore(o=>o.inv('"')) && o('"'),
 	
 	IdChain     :o=>o.fold(o=>o.Id && o.zeroOrMore(o=>o('.') && o.Id)),
 
@@ -38,8 +40,6 @@ var defGrammar = {
 	DoBlock		:o=>o('do') && o.ws && o.eat('\n') && 
 				o.Statements &&
 				o.ws && o('end'),
-
-	//String  	:o=>o('"') && o.zeroOrMore(o=>o.inv('"')) && o('"'),
 
 	Statements  :o=>o.zeroOrMore(o=>o.ws && o('\n')) && o.zeroOrMore(o=>o.not(o=>o('end') || o('else')) && o.Statement),
 
@@ -177,12 +177,20 @@ function makeParser(rules) {
 	p.__defineGetter__('Id', function() {
 		var input = p.input
 		var pos = p.pos
-		var ch = input.charCodeAt(p.pos)
-		if(ch >= 65 && ch <=90 || ch >= 97 && ch <= 122 || ch == 95){
+		var c1 = input.charCodeAt(p.pos)
+
+		// check for do end or if
+		var c2 = input.charCodeAt(p.pos+1)
+		var c3 = input.charCodeAt(p.pos+2)
+		if(c1 == 100 && c2 == 111)  return false // do
+		if(c1 == 105 && c2 == 102) return false //if
+		if(c1 == 101 && c2 == 110 && c3 == 100) return false // end
+
+		if(c1 >= 65 && c1 <=90 || c1 >= 97 && c1 <= 122 || c1 == 95){
 			p.pos++
 			while(p.pos < input.length){
-				ch = input.charCodeAt(++p.pos)
-				if(!(ch >=48 && ch <= 57 || ch >= 65 && ch <=90 || ch >= 97 && ch <= 122 || ch == 95)){
+				c1 = input.charCodeAt(++p.pos)
+				if(!(c1 >=48 && c1 <= 57 || c1 >= 65 && c1 <=90 || c1 >= 97 && c1 <= 122 || c1 == 95)){
 					break
 				}
 			}
@@ -266,7 +274,6 @@ function makeParser(rules) {
 			// lets check our memoize fn 
 			
 			// if we do the same item at the same spot, return it
-
 			p.stack.push(key)
 
 			var memo = p.memoize[pos]
