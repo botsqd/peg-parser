@@ -50,7 +50,7 @@ var defGrammar = {
 	Attribute	:o=>o('@') && o.Id && o.rws && o.Expression && o.oneOrMore(o=>o.ws && o.eat('\n')),
 	
 	Expression  :o=>o.Assign || o.Logic || o.Math || o.ExprAtom,
-	ExprAtom    :o=>o.fold(o=>o.CallParen || o.If || o.DoBlock || o.List || o.String || o.Atom || o.AttribRef || o.Number || o.PrefId|| o.Boolean),
+	ExprAtom    :o=>o.fold(o=>o.CallParen || o.If || o.DoBlock || o.List || o.String || o.Atom || o.AttribRef || o.Number|| o.Boolean || o.PrefId),
 	List 		:o=>o('[') && o.ws && o.zeroOrOne(o=>o.Expression) && o.zeroOrMore(o=>o.ws && o(',') && o.ws && o.Expression) && o.ws && o(']'),
 
 	Label       :o=>o.Id && o(':'),
