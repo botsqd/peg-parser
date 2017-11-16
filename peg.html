@@ -84,41 +84,6 @@ var defGrammar = {
 	Prod    :o=>o.fold(o=>o.MathS && o.zeroOrMore(o=>o.ws && (o('*') || o('/')) && o.ws && o.MathS)),
 	MathS   :o=>o.fold(o=>o.CallParen || o.PrefId || o.Atom || o.AttribRef ||  o.Number || o.Boolean || o('(') && o.ws && o.Expression && o.ws && o(')'))
 
-
-	// ok so the problem is how do we recognise a call
-	//Statemnt	:o=>o.any(o=>o.Expr) && o.
-	//Expr 		:o=>o.any(o=>o.Ask)
-	//Say     	:o=>o.ws && o('say') && o.ws && o.String,
-	//Ask     	:o=>o.ws && o('ask') && o.ws && o.String,
-	//Assign		:o=>o.ws && o.Name && o.ws && o('=') && o.ws && o.Expr && o.eat('\n')
-
-	// Start   :o=>o.Form,
-	// ws      :o=>o.fold(o=>o.any(o=>o.eat(' ') || o.eat('\t'))),
-	// Form    :o=>o('form') && o.many(o=>o.eat(' ')) && o.Id && o.ws && o.Body,
-	// Body    :o=>o.ws && o('{') && o.ws && o.eat('\n') && 
-	// 	o.any(o=>o.Answer || o.Question || o.Message || o.If) && 
-	// 	o.ws && o('}') && o.ws && o.many(o=>o.eat('\n')),
-	// Question:o=>o.ws && o.String && o.ws && o.eat('\n') && 
-	// 	o.ws && o.Id && o.eat(':') && o.ws && o.Type && o.eat('\n'),
-	// Answer  :o=>o.ws && o.String && o.ws && o.eat('\n') && 
-	// 	o.ws && o.Id && o.eat(':') && o.ws && o.Type && o.ws && o.eat('=') && o.ws && o.eat('\n') && 
-	// 	o.ws && o.Expr && o.eat('\n'),
-	// Message :o=>o.ws && o.String && o.ws && o.eat('\n'),
-	// If      :o=>o.ws && o('if') && o.ws && o('(') && o.ws && o.Logic && o.ws && o(')') && o.Body,
-//	String  :o=>o('"') && o.any(o=>o.inv('"')) && o('"')
-	// Type    :o=>(o('boolean') || o('money')),
-	// Id      :o=>(o('a', 'z') || o('A', 'Z')) && o.any(o=>o('a', 'z') || o('A', 'Z') || o('0', '9')),
-	// Number  :o=>(o.zeroOrOne(o=>o('-')) && o.many(o=>o('0', '9')) && o.zeroOrOne(o=>o('.') && o.many(o=>o('0', '9')))),
-	// Logic   :o=>o.fold(o=>o.Or),
-	// Or      :o=>o.fold(o=>o.And && o.any(o=>o.ws && o('||') && o.ws && o.And)),
-	// And     :o=>o.fold(o=>o.Cmp && o.any(o=>o.ws && o('&&') && o.ws && o.Cmp)),
-	// Cmp     :o=>o.fold(o=>o.LogicS && o.zeroOrOne(o=>o.ws && (o('<=') || o('<') || o('>=') || o('>') || o('!=')) && o.ws && o.LogicS)),
-	// LogicS  :o=>o.fold(o=>o.NotId || o.Number || o('(') && o.Logic && o(')')),
-	// NotId   :o=>o.empty(o=>o.zeroOrOne(o=>o('!')) && o.ws && o.Id, 1),
-	// Expr    :o=>o.fold(o=>o.Sum),
-	// Sum     :o=>o.fold(o=>o.Prod && o.any(o=>o.ws && (o('+') || o('-')) && o.ws && o.Prod)),
-	// Prod    :o=>o.fold(o=>o.ExprS && o.any(o=>o.ws && (o('*') || o('/')) && o.ws && o.ExprS)),
-	// ExprS   :o=>o.fold(o=>o.Id || o.Number || o('(') && o.Expr && o(')'))
 }
 // Input form
 var inputSource = document.getElementById('file').childNodes[1].nodeValue
@@ -166,6 +131,7 @@ function makeParser(rules) {
 	}
 	
 	p.parse = function(input) {
+		p.memoize = {}
 		p.input = input
 		p.pos = 0
 		p.last = 0
@@ -258,7 +224,7 @@ function makeParser(rules) {
 		return ret
 	}
 	
-	p.memoize = {}
+	
 
 	for(var key in rules){
 		p.__defineGetter__(key, function(key) {
