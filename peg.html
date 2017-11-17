@@ -26,9 +26,9 @@ var defGrammar = {
 	Comment     :o=>o.do('#') && o.zeroOrMore(o=>o.inv('\n')),
 	CommentLine :o=>o.ws && o.eat('\n') || o.do('#') && o.zeroOrMore(o=>o.inv('\n')) && o.eat('\n'),
 
-	Arrow       :o=>o.ws && o.Expression && o.ws && o.do('->') && o.zeroOrMore(o=>o.ws && o.do('\n') && o.ws) && (o.CallNoParen || o.Expression),
+	Arrow       :o=>o.ws && o.Expression && o.ws && o.do('->') && o.zeroOrMore(o=>o.ws && o.do('\n') && o.ws) && (o.BlockExpression),
 
-	BlockExpression	:o=>o.ws && (o.CallNoParen || o.Arrow || o.Expression),
+	BlockExpression	:o=>o.ws && (o.CallNoParen || o.Expression),
 
 	Statement	:o=>o.ws && o.group(o=>o.CallNoParen || o.Arrow || o.Expression || o.Comment) && o.zeroOrMore(o=>o.ws && o.Comment) && o.ws && o.eat('\n'),
 	
