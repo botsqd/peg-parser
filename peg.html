@@ -8,74 +8,74 @@ var LOG = 0
 
 // GRAMMAR
 var defGrammar = {
-	Start   	:o=>o.zeroOrMore(o=>o.ws && o('\n')) && o.zeroOrMore(o=>o.Attribute || o.Statement || o.CommentLine),	
-	IdChain     :o=>o.fold(o=>o.NotKeyword && o.Id && o.zeroOrMore(o=>o('.') && o.Id)),
+	Start   	:o=>o.zeroOrMore(o=>o.ws && o.do('\n')) && o.zeroOrMore(o=>o.Attribute || o.Statement || o.CommentLine),	
+	IdChain     :o=>o.fold(o=>o.NotKeyword && o.Id && o.zeroOrMore(o=>o.do('.') && o.Id)),
 
-	PrefId      :o=>o.empty(o=>o.zeroOrOne(o=>o('!')||o('-')||o('+')) && o.ws && o.IdChain, 1),
+	PrefId      :o=>o.empty(o=>o.zeroOrOne(o=>o.do('!')||o.do('-')||o.do('+')) && o.ws && o.IdChain, 1),
 
-	Number      :o=>(o.zeroOrOne(o=>o('-')) && o.oneOrMore(o=>o('0', '9')) && o.zeroOrOne(o=>o('.') && o.oneOrMore(o=>o('0', '9')))),
-	Boolean     :o=>o('true') || o('false'),
+	Number      :o=>(o.zeroOrOne(o=>o.do('-')) && o.oneOrMore(o=>o.do('0', '9')) && o.zeroOrOne(o=>o.do('.') && o.oneOrMore(o=>o.do('0', '9')))),
+	Boolean     :o=>o.do('true') || o.do('false'),
 
-	ElseLine    :o=>o('else:') && o.ws && o.BlockExpression,
-	DoLine      :o=>o('do:') && o.ws && o.BlockExpression,
+	ElseLine    :o=>o.do('else:') && o.ws && o.BlockExpression,
+	DoLine      :o=>o.do('do:') && o.ws && o.BlockExpression,
 
-	DoBlock		:o=>o('do') && o.ws && o.eat('\n') && o.zeroOrMore(o=>o.ws && o('\n')) && o.Statements && o.ws && o('end'),
+	DoBlock		:o=>o.do('do') && o.ws && o.eat('\n') && o.zeroOrMore(o=>o.ws && o.do('\n')) && o.Statements && o.ws && o.do('end'),
 
-	Statements  :o=>o.zeroOrMore(o=>o.not(o=>o.eat('end') || o.eat('else')) && o.zeroOrMore(o=>o.ws && o('\n')) && (o.Statement || o.CommentLine)),
+	Statements  :o=>o.zeroOrMore(o=>o.not(o=>o.eat('end') || o.eat('else')) && o.zeroOrMore(o=>o.ws && o.do('\n')) && (o.Statement || o.CommentLine)),
 
-	Comment     :o=>o('#') && o.zeroOrMore(o=>o.inv('\n')),
-	CommentLine :o=>o.ws && o.eat('\n') || o('#') && o.zeroOrMore(o=>o.inv('\n')) && o.eat('\n'),
+	Comment     :o=>o.do('#') && o.zeroOrMore(o=>o.inv('\n')),
+	CommentLine :o=>o.ws && o.eat('\n') || o.do('#') && o.zeroOrMore(o=>o.inv('\n')) && o.eat('\n'),
 
-	Arrow       :o=>o.ws && o.Expression && o.ws && o('->') && o.zeroOrMore(o=>o.ws && o('\n') && o.ws) && (o.CallNoParen || o.Expression),
+	Arrow       :o=>o.ws && o.Expression && o.ws && o.do('->') && o.zeroOrMore(o=>o.ws && o.do('\n') && o.ws) && (o.CallNoParen || o.Expression),
 
 	BlockExpression	:o=>o.ws && (o.CallNoParen || o.Arrow || o.Expression),
 
 	Statement	:o=>o.ws && o.group(o=>o.CallNoParen || o.Arrow || o.Expression || o.Comment) && o.zeroOrMore(o=>o.ws && o.Comment) && o.ws && o.eat('\n'),
 	
-	Attribute	:o=>o('@') && o.Id && o.rws && o.Expression && o.oneOrMore(o=>o.ws && o.eat('\n')),
+	Attribute	:o=>o.do('@') && o.Id && o.rws && o.Expression && o.oneOrMore(o=>o.ws && o.eat('\n')),
 	
 	Expression  :o=>o.Assign || o.Logic || o.Math || o.ExprItem,
 	ExprItem    :o=>o.fold(o=>o.CallParen || o.If || o.List || o.Map || o.String || o.Atom || o.AttribRef || o.Number|| o.Boolean || o.PrefId),
-	List 		:o=>o('[') && o.ws && o.zeroOrOne(o=>o.Expression) && o.zeroOrMore(o=>o.ws && o(',') && o.ws && o.Expression) && o.ws && o(']'),
+	List 		:o=>o.do('[') && o.ws && o.zeroOrOne(o=>o.Expression) && o.zeroOrMore(o=>o.ws && o.do(',') && o.ws && o.Expression) && o.ws && o.do(']'),
 	
-	IdElem      :o=>o.Id && o(':') && o.ws && o.Expression,
-	ExprElem    :o=>o.Expression && o.ws && o('=>') && o.ws && o.Expression,	
-	Map 		:o=>o('%{') && o.ws && o.zeroOrOne(o=>o.IdElem || o.ExprElem) && o.zeroOrMore(o=>o.ws && o(',') && o.ws && (o.IdElem || o.ExprElem)) && o.ws && o('}'),
+	IdElem      :o=>o.Id && o.do(':') && o.ws && o.Expression,
+	ExprElem    :o=>o.Expression && o.ws && o.do('=>') && o.ws && o.Expression,	
+	Map 		:o=>o.do('%{') && o.ws && o.zeroOrOne(o=>o.IdElem || o.ExprElem) && o.zeroOrMore(o=>o.ws && o.do(',') && o.ws && (o.IdElem || o.ExprElem)) && o.ws && o.do('}'),
 
-	Label       :o=>o.NotKeyword && o.Id && o(':'),
-	Atom        :o=>o(':') && o.Id,
-	AttribRef   :o=>o('@') && o.Id,
+	Label       :o=>o.NotKeyword && o.Id && o.do(':'),
+	Atom        :o=>o.do(':') && o.Id,
+	AttribRef   :o=>o.do('@') && o.Id,
 
 	ParenArg    :o=>o.NotKeyword && o.zeroOrOne(o=>o.Label && o.ws) && (o.Expression || o.DoLine),
-	CallParen   :o=>o.IdChain && o.ws && o('(') && o.ws && o.zeroOrOne(o=>o.ParenArg) && o.zeroOrMore(o=>o.ws && o(',') && o.ws && o.ParenArg) && o.ws && o(')') && o.zeroOrOne(o=>o.ws && (o.DoLine || o.DoBlock )),
+	CallParen   :o=>o.IdChain && o.ws && o.do('(') && o.ws && o.zeroOrOne(o=>o.ParenArg) && o.zeroOrMore(o=>o.ws && o.do(',') && o.ws && o.ParenArg) && o.ws && o.do(')') && o.zeroOrOne(o=>o.ws && (o.DoLine || o.DoBlock )),
 
 	NoParenArg  :o=>o.zeroOrOne(o=>o.Label && o.ws) && (o.Expression || o.DoLine || o.DoBlock),
-	CallNoParen	:o=>o.IdChain && o.rws && o.NoParenArg && o.zeroOrMore(o=>( o.group(o=>o.ws && o(',') && o.ws)) && o.NoParenArg) && o.zeroOrOne(o=>o.ws && o.DoBlock ),
+	CallNoParen	:o=>o.IdChain && o.rws && o.NoParenArg && o.zeroOrMore(o=>( o.group(o=>o.ws && o.do(',') && o.ws)) && o.NoParenArg) && o.zeroOrOne(o=>o.ws && o.DoBlock ),
 	
-	ElseBlock: 	o=>o('do') && o.ws && o.eat('\n') && 
+	ElseBlock: 	o=>o.do('do') && o.ws && o.eat('\n') && 
 				o.Statements &&
-				o.ws && o('else') && o.ws && o.eat('\n') &&
+				o.ws && o.do('else') && o.ws && o.eat('\n') &&
 				o.Statements &&
-				o.ws && o('end'),
+				o.ws && o.do('end'),
 
-	If: o=>o('if') && o.rws && o.Expression && (o.group(o=>o(',') && o.ws && o.DoLine && o.zeroOrOne(o=>o.ws && o(',') && o.ws && o.ElseLine))) || (o.rws && (o.ElseBlock || o.DoBlock)),
+	If: o=>o.do('if') && o.rws && o.Expression && (o.group(o=>o.do(',') && o.ws && o.DoLine && o.zeroOrOne(o=>o.ws && o.do(',') && o.ws && o.ElseLine))) || (o.rws && (o.ElseBlock || o.DoBlock)),
 
-	Assign		:o=>o.NotKeyword && o.IdChain && o.ws && o.group(o=>o('+=')||o('-=')||o('/=')||o('*=')||o('=')) && o.ws && o.BlockExpression,
+	Assign		:o=>o.NotKeyword && o.IdChain && o.ws && o.group(o=>o.do('+=')||o.do('-=')||o.do('/=')||o.do('*=')||o.do('=')) && o.ws && o.BlockExpression,
 
 	Logic   :o=>o.foldTwo(o=>o.Or),
-	Or      :o=>o.fold(o=>o.And && o.zeroOrMore(o=>o.ws && o('||') && o.ws && o.And)),
-	And     :o=>o.fold(o=>o.Cmp && o.zeroOrMore(o=>o.ws && o('&&') && o.ws && o.Cmp)),
-	Cmp     :o=>o.fold(o=>o.LogicS && o.zeroOrOne(o=>o.ws && (o('<=') || o('<') || o('>=') || o('>') || o('!=') || o('==')) && o.ws && o.LogicS)),
-	LogicS  :o=>o.fold(o=>o.ExprItem || o('(') && o.ws && o.Expression && o.ws && o(')')),
+	Or      :o=>o.fold(o=>o.And && o.zeroOrMore(o=>o.ws && o.do('||') && o.ws && o.And)),
+	And     :o=>o.fold(o=>o.Cmp && o.zeroOrMore(o=>o.ws && o.do('&&') && o.ws && o.Cmp)),
+	Cmp     :o=>o.fold(o=>o.LogicS && o.zeroOrOne(o=>o.ws && (o.do('<=') || o.do('<') || o.do('>=') || o.do('>') || o.do('!=') || o.do('==')) && o.ws && o.LogicS)),
+	LogicS  :o=>o.fold(o=>o.ExprItem || o.do('(') && o.ws && o.Expression && o.ws && o.do(')')),
 
 	Math    :o=>o.foldTwo(o=>o.Sum),
-	Sum     :o=>o.fold(o=>o.Prod && o.zeroOrMore(o=>o.ws && (o('+') || o('-')) && o.ws  && o.Prod)),
-	Prod    :o=>o.fold(o=>o.MathS && o.zeroOrMore(o=>o.ws && (o('*') || o('/')) && o.ws && o.MathS)),
-	MathS   :o=>o.fold(o=>o.ExprItem || o('(') && o.ws && o.Expression && o.ws && o(')')),
+	Sum     :o=>o.fold(o=>o.Prod && o.zeroOrMore(o=>o.ws && (o.do('+') || o.do('-')) && o.ws  && o.Prod)),
+	Prod    :o=>o.fold(o=>o.MathS && o.zeroOrMore(o=>o.ws && (o.do('*') || o.do('/')) && o.ws && o.MathS)),
+	MathS   :o=>o.fold(o=>o.ExprItem || o.do('(') && o.ws && o.Expression && o.ws && o.do(')')),
 
 	// optimized out:
-	//Id	    :o=>o.not(o=>o('do') || o('end') || o('if')) && (o('a', 'z') || o('A', 'Z') || o('_')) && o.zeroOrMore(o=>o('a', 'z') || o('A', 'Z') || o('0', '9') || o('_')),
-	//String  	:o=>o('"') && o.zeroOrMore(o=>o.inv('"')) && o('"'),
+	//Id	    :o=>o.not(o=>o.do('do') || o.do('end') || o.do('if')) && (o.do('a', 'z') || o.do('A', 'Z') || o.do('_')) && o.zeroOrMore(o=>o.do('a', 'z') || o.do('A', 'Z') || o.do('0', '9') || o.do('_')),
+	//String  	:o=>o.do('"') && o.zeroOrMore(o=>o.inv('"')) && o.do('"'),
 
 	// optimized getters
 	_ws     :function() {
@@ -133,7 +133,7 @@ var defGrammar = {
 					o.ast.n.push({
 						type:'Id',
 						value:input.slice(pos, o.pos), 
-						start:pos, end:o.pos
+						start:pos+ o.delta, end:o.pos+ o.delta
 					})
 					if(LOG) _='Id:[' + input.slice(pos, o.pos) + ']' + input.slice(o.pos + 1)
 					break
@@ -147,17 +147,48 @@ var defGrammar = {
 		var input = o.input
 		var pos = o.pos
 		var ch = input.charCodeAt(o.pos)
+		var ast = {type:'String', start:pos + o.delta}
+		var last = pos+1
 		if(ch == 34){
 			while(o.pos < input.length){
 				ch = input.charCodeAt(++o.pos)
+				if(ch === 35 && input.charCodeAt(o.pos+1) === 123){ // interpolate strings
+					// lets find the end
+					for(var j = o.pos+2; j < input.length; j++){
+						if(input.charCodeAt(j) === 125){
+							break
+						}
+					}
+					var subparser = new this.constructor(input.slice(o.pos+2, j), 'Expression', o.pos+2)
+					if(!ast.n) ast.n = []
+					// push last string
+					if(last !== o.pos) ast.n.push({
+						type:'String',
+						value: input.slice(last, o.pos)
+					})
+					ast.n.push(subparser.ast.n[0])
+					last = j+1
+					//var subparser = Object.create(this)
+					//subparser.parse()
+					//this.parse()
+					//var oldast = this.ast
+					//var memoize = 
+					//this.input = 
+					//this.pos = 0
+					// parse the string interp
+					//this.Start
+				}
 				if(ch === 34){
+					if(o.pos !== last && last !== pos+1){
+						if(last !== o.pos) ast.n.push({
+							type:'String',
+							value: input.slice(last, o.pos)
+						})
+					}
 					o.pos++
 					if(!o.ast.n) o.ast.n = []
-					o.ast.n.push({
-						type:'String',
-						value:input.slice(pos, o.pos), 
-						start:pos, end:o.pos
-					})
+					ast.value = input.slice(pos, o.pos)
+					o.ast.n.push(ast)
 					if(LOG) _='String:[' + input.slice(pos, o.pos) + ']' + input.slice(o.pos + 1)
 					return true
 				}
@@ -172,75 +203,82 @@ var inputSource = document.getElementById('file').childNodes[1].nodeValue
 
 function makeParser(rules) {
 	
-	function p(a, b, eat, inv) {
-		var input = p.input
-		if(p.pos > input.length) return false
+	function Parser(input, name = 'Start', delta = 0){
+		this.memoize = {}
+		this.input = input
+		this.pos = 0
+		this.delta = delta
+		this.last = 0
+		var ast = this.ast = {n:[]}
+		this.fail = []
+		this.stack = []
+		this[name]
+	}
+
+	var proto = Parser.prototype
+
+	proto.do = function(a, b, eat, inv) {
+		var o = this
+		var input = o.input
+		if(o.pos > input.length) return false
 		if(typeof b === 'string') { // range
-			var c = input.charCodeAt(p.pos)
+			var c = input.charCodeAt(o.pos)
 			var cin = c >= a.charCodeAt(0) && c <= b.charCodeAt(0)
 			if(inv && !cin || !inv && cin) {
-				if(!eat) p.ast.value += input.charAt(p.pos)
-				if(LOG) _='[' + input.charAt(p.pos) + ']' + input.slice(p.pos + 1)
-				p.pos++
+				if(!eat) o.ast.value += input.charAt(o.pos)
+				if(LOG) _='[' + input.charAt(o.pos) + ']' + input.slice(o.pos + 1)
+				o.pos++
 				return true
 			}
-			if(LOG) _='!' + input.charAt(p.pos) + '!' + input.slice(p.pos + 1)
+			if(LOG) _='!' + input.charAt(o.pos) + '!' + input.slice(o.pos + 1)
 			return false
 		}
 		var s = ''
-		for(var i = 0, pos = p.pos;i < a.length;i++,pos++){ // string match
+		for(var i = 0, pos = o.pos;i < a.length;i++,pos++){ // string match
 			s += input.charAt(pos)
 			var cin = input.charCodeAt(pos) !== a.charCodeAt(i)
 			if(inv && !cin || !inv && cin) {
-				if(LOG) _='!' + s + '!' + '('+a+')'+input.slice(p.pos + s.length)
+				if(LOG) _='!' + s + '!' + '('+a+')'+input.slice(o.pos + s.length)
 				return false
 			}
 		}
-		if(LOG) _='[' + s + ']' + input.slice(p.pos + s.length)
+		if(LOG) _='[' + s + ']' + input.slice(o.pos + s.length)
 		
-		if(!eat) p.ast.value += s
-		if(pos > p.last) p.last = pos
-		p.pos = pos
+		if(!eat) o.ast.value += s
+		if(pos > o.last) o.last = pos
+		o.pos = pos
 		return true
 	}
-	p.__defineSetter__('trace', function(value){
+
+	proto.__defineSetter__('trace', function(value){
 		console.log('TRACE',value)
 		//debugger
 	})
-	p.eat = function(a, b) {
-		return p(a, b, true)
+
+	proto.eat = function(a, b) {
+		return this.do(a, b, true)
 	}
 	
-	p.inv = function(a, b) {
-		return p(a, b, false, true)
+	proto.inv = function(a, b) {
+		return this.do(a, b, false, true)
 	}
 	
-	p.parse = function(input) {
-		p.memoize = {}
-		p.input = input
-		p.pos = 0
-		p.last = 0
-		var ast = p.ast = {n:[]}
-		p.fail = []
-		p.stack = []
-		p.Start
-		return ast.n[0]
-	}
-	
-	p.fold = function(fn) {
-		if(fn(p)) {
-			if(p.ast.n.length < 2) return 0
+	proto.fold = function(fn) {
+		var o = this
+		if(fn(o)) {
+			if(o.ast.n.length < 2) return 0
 			return true
 		}
 		return false
 	}
 
-	p.foldTwo = function(fn) {
-		if(fn(p)) {
-			var len = p.ast.n.length
+	proto.foldTwo = function(fn) {
+		var o = this
+		if(fn(o)) {
+			var len = o.ast.n.length
 			if(len < 2){
 				if(len === 1){
-					var n2 = p.ast.n[0].n
+					var n2 = o.ast.n[0].n
 					if(!n2 || n2.length < 2) return false
 				}
 				return 0
@@ -250,32 +288,34 @@ function makeParser(rules) {
 		return false
 	}
 
-	p.empty = function(fn) {
-		if(fn(p)) {
-			if(p.ast.value.length == 0) return 0
+	proto.empty = function(fn) {
+		var o = this
+		if(fn(o)) {
+			if(o.ast.value.length == 0) return 0
 			return true
 		}
 		return false
 	}
 
-
-	p.zeroOrMore = function(fn) { //zero or more
+	proto.zeroOrMore = function(fn) { //zero or more
+		var o = this
 		while(1){
-			var pos = p.pos
-			if(!fn(p)){
-				p.pos = pos
+			var pos = o.pos
+			if(!fn(o)){
+				o.pos = pos
 				break
 			}
 		}
 		return true
 	}
 	
-	p.oneOrMore = function(fn) { //one or more
+	proto.oneOrMore = function(fn) { //one or more
+		var o = this
 		var c = 0
 		while(1){
-			var pos = p.pos
-			if(!fn(p)){
-				p.pos = pos
+			var pos = o.pos
+			if(!fn(o)){
+				o.pos = pos
 				break
 			}
 			c++
@@ -283,69 +323,71 @@ function makeParser(rules) {
 		return c !== 0
 	}
 	
-	p.zeroOrOne = function(fn) { //one or more
-		var pos = p.pos
-		if(!fn(p)){
-			p.pos = pos
+	proto.zeroOrOne = function(fn) { //one or more
+		var o = this
+		var pos = o.pos
+		if(!fn(o)){
+			o.pos = pos
 		}
 		return true
 	}
 	
-	p.not = function(fn, b) {
-		var pos = p.pos, ret = fn(p)
-		p.pos = pos
+	proto.not = function(fn, b) {
+		var o = this
+		var pos = o.pos, ret = fn(o)
+		o.pos = pos
 		return !ret
 	}
 	
-	p.and = function(fn, b) {
-		var pos = p.pos, ret = fn(p)
-		p.pos = pos
+	proto.and = function(fn, b) {
+		var pos = o.pos, ret = fn(o)
+		o.pos = pos
 		return ret
 	}
 	
-	p.group = function(fn) {
-		var pos = p.pos, ret = fn(p)
-		if(!ret) p.pos = pos
+	proto.group = function(fn) {
+		var o = this
+		var pos = o.pos, ret = fn(o)
+		if(!ret) o.pos = pos
 		return ret
 	}
-
-	for(var key in rules){
-
-		function getter(key, debug) {
-			
-			var pos = p.pos
+	
+	function makeGetter(key){
+		return function getter() {
+			var o = this
+			var pos = o.pos
 
 			var rule = rules[key]
-			var parent = p.ast
+			var parent = o.ast
 			// lets check our memoize fn 
 			
 			// if we do the same item at the same spot, return it
-			p.stack.push(key)
+			o.stack.push(key)
 
-			var memo = p.memoize[pos]
+			var memo = o.memoize[pos+ this.delta]
 			var mine = memo && memo[key]
 			var ret
 			if(!mine){
-				mine = p.ast = {type:key, value:'', start:pos}
-				if(debug) console.log('No memo', p.input.slice(p.pos, p.pos + 50).replace(/\n/g,'\\n'))
-				ret = rule(p)
+				mine = o.ast = {type:key, value:'', start:pos+ this.delta}
+				//if(debug) console.log('No memo', o.input.slice(o.pos, o.pos + 50).replace(/\n/g,'\\n'))
+				ret = rule(o)
 			}
 			else{
-				if(debug) console.log('Memo', key)
-				p.pos = mine.end
+				//if(debug) console.log('Memo', key)
+				o.pos = mine.end
 				ret = true
 			}
 
-			p.ast = parent
+			o.ast = parent
 
 			if(ret === true) {
-				var memo = p.memoize[mine.start] || (p.memoize[mine.start] = {})
+				var memo = o.memoize[mine.start] || (o.memoize[mine.start] = {})
 				memo[key] = mine
-				mine.end = p.pos
+				mine.end = o.pos
 				if(!parent.n) parent.n = []
 				parent.n.push(mine)
 				parent[key] = mine
-				p.stack.pop()
+				o.stack.pop()
 				return true
 			}
 			else if(ret === 0) {
@@ -354,25 +396,26 @@ function makeParser(rules) {
 					if(!parent.n) parent.n = []
 					parent.n.push(mine.n[0])
 				}
-				p.stack.pop()
+				o.stack.pop()
 				return true
 			}
-			p.fail.push(p.stack.join('/'))
-			p.stack.pop()
-			p.pos = pos
+			o.fail.push(o.stack.join('/'))
+			o.stack.pop()
+			o.pos = pos
 			return false
 		}
+	}
 
+	for(var key in rules){		
 		if(key.charAt(0) === '_'){
-			p.__defineGetter__(key.slice(1), rules[key])
+			proto.__defineGetter__(key.slice(1), rules[key])
 		}
 		else{
-			p.__defineGetter__(key, getter.bind(this, key))
-			p.__defineGetter__('_' + key, getter.bind(this, key, true))
-		}			
+			proto.__defineGetter__(key, makeGetter(key))
+		}
 	}
 	
-	return p
+	return Parser
 }
 Error.stackTraceLimit=150
 window.__defineSetter__('_', function(arg){
@@ -391,18 +434,19 @@ window.__defineSetter__('_', function(arg){
 	console.log(str + ': '+arg.replace(/\n/g, '\\n'))
 })
 
-var parser = makeParser(defGrammar)
+var Parser = makeParser(defGrammar)
+
 var dt = Date.now()
 var bench = false
 if(bench){
 	var dt = Date.now()
 	for(var i = 0; i <100; i++){
-		var ast = parser.parse(inputSource)
+		var parser = new Parser(inputSource)
 	}
 	console.log("Performance per parse: "+((Date.now()-dt)/100)+"ms")
 }
-
-var ast = parser.parse(inputSource)
+var parser = new Parser(inputSource)
+var ast = parser.ast
 
 /*
 var serializeAST = {
@@ -469,14 +513,12 @@ document.addEventListener('DOMContentLoaded', run)
 <div id='file2'>
 <!--
 
-dialog main do
-	say hi
-end
-
 -->
 </div>
 <div id='file'>
 <!--
+"hi#{test.test1}ho"
+
 
 %{map:key, map=>key}
 
