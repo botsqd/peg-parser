@@ -16,9 +16,10 @@ var defGrammar = {
 	Number      :o=>(o.zeroOrOne(o=>o('-')) && o.oneOrMore(o=>o('0', '9')) && o.zeroOrOne(o=>o('.') && o.oneOrMore(o=>o('0', '9')))),
 	Boolean     :o=>o('true') || o('false'),
 
-	DoLine      :o=>o('do:') && o.Statement,
+	ElseLine    :o=>o('else:') && o.ws && o.BlockExpression,
+	DoLine      :o=>o('do:') && o.ws && o.BlockExpression,
 
-	DoBlock		:o=>o('do') && o.ws && o.eat('\n') && o.Statements && o.ws && o('end'),
+	DoBlock		:o=>o('do') && o.ws && o.eat('\n') && o.zeroOrMore(o=>o.ws && o('\n')) && o.Statements && o.ws && o('end'),
 
 	Statements  :o=>o.zeroOrMore(o=>o.not(o=>o.eat('end') || o.eat('else')) && o.zeroOrMore(o=>o.ws && o('\n')) && (o.Statement || o.CommentLine)),
 
@@ -27,23 +28,29 @@ var defGrammar = {
 
 	Arrow       :o=>o.ws && o.Expression && o.ws && o('->') && o.zeroOrMore(o=>o.ws && o('\n') && o.ws) && (o.CallNoParen || o.Expression),
 
+	BlockExpression	:o=>o.ws && (o.CallNoParen || o.Arrow || o.Expression),
+
 	Statement	:o=>o.ws && o.group(o=>o.CallNoParen || o.Arrow || o.Expression || o.Comment) && o.zeroOrMore(o=>o.ws && o.Comment) && o.ws && o.eat('\n'),
 	
 	Attribute	:o=>o('@') && o.Id && o.rws && o.Expression && o.oneOrMore(o=>o.ws && o.eat('\n')),
 	
 	Expression  :o=>o.Assign || o.Logic || o.Math || o.ExprItem,
-	ExprItem    :o=>o.fold(o=>o.CallParen || o.If || o.DoLine || o.DoBlock  || o.List || o.String || o.Atom || o.AttribRef || o.Number|| o.Boolean || o.PrefId),
+	ExprItem    :o=>o.fold(o=>o.CallParen || o.If || o.List || o.Map || o.String || o.Atom || o.AttribRef || o.Number|| o.Boolean || o.PrefId),
 	List 		:o=>o('[') && o.ws && o.zeroOrOne(o=>o.Expression) && o.zeroOrMore(o=>o.ws && o(',') && o.ws && o.Expression) && o.ws && o(']'),
+	
+	IdElem      :o=>o.Id && o(':') && o.ws && o.Expression,
+	ExprElem    :o=>o.Expression && o.ws && o('=>') && o.ws && o.Expression,	
+	Map 		:o=>o('%{') && o.ws && o.zeroOrOne(o=>o.IdElem || o.ExprElem) && o.zeroOrMore(o=>o.ws && o(',') && o.ws && (o.IdElem || o.ExprElem)) && o.ws && o('}'),
 
 	Label       :o=>o.NotKeyword && o.Id && o(':'),
 	Atom        :o=>o(':') && o.Id,
 	AttribRef   :o=>o('@') && o.Id,
 
-	ParenArg    :o=>o.zeroOrOne(o=>o.Label && o.ws) && o.Expression,
+	ParenArg    :o=>o.NotKeyword && o.zeroOrOne(o=>o.Label && o.ws) && (o.Expression || o.DoLine),
 	CallParen   :o=>o.IdChain && o.ws && o('(') && o.ws && o.zeroOrOne(o=>o.ParenArg) && o.zeroOrMore(o=>o.ws && o(',') && o.ws && o.ParenArg) && o.ws && o(')') && o.zeroOrOne(o=>o.ws && (o.DoLine || o.DoBlock )),
 
-	NoParenArg  :o=>o.zeroOrOne(o=>o.Label && o.ws) && o.Expression,
-	CallNoParen	:o=>o.IdChain && o.rws && o.NoParenArg && o.zeroOrMore(o=>( o.group(o=>o.ws && o(',') && o.ws) ||o.rws) && o.NoParenArg),
+	NoParenArg  :o=>o.zeroOrOne(o=>o.Label && o.ws) && (o.Expression || o.DoLine || o.DoBlock),
+	CallNoParen	:o=>o.IdChain && o.rws && o.NoParenArg && o.zeroOrMore(o=>( o.group(o=>o.ws && o(',') && o.ws)) && o.NoParenArg) && o.zeroOrOne(o=>o.ws && o.DoBlock ),
 	
 	ElseBlock: 	o=>o('do') && o.ws && o.eat('\n') && 
 				o.Statements &&
@@ -51,9 +58,9 @@ var defGrammar = {
 				o.Statements &&
 				o.ws && o('end'),
 
-	If: o=>o('if') && o.rws && o.Expression && o.rws && (o.ElseBlock || o.DoLine || o.DoBlock ),
+	If: o=>o('if') && o.rws && o.Expression && (o.group(o=>o(',') && o.ws && o.DoLine && o.zeroOrOne(o=>o.ws && o(',') && o.ws && o.ElseLine))) || (o.rws && (o.ElseBlock || o.DoBlock)),
 
-	Assign		:o=>o.Id && o.ws && o.group(o=>o('+=')||o('-=')||o('/=')||o('*=')||o('=')) && o.ws && (o.CallNoParen || o.Expression),
+	Assign		:o=>o.NotKeyword && o.IdChain && o.ws && o.group(o=>o('+=')||o('-=')||o('/=')||o('*=')||o('=')) && o.ws && o.BlockExpression,
 
 	Logic   :o=>o.foldTwo(o=>o.Or),
 	Or      :o=>o.fold(o=>o.And && o.zeroOrMore(o=>o.ws && o('||') && o.ws && o.And)),
@@ -104,7 +111,9 @@ var defGrammar = {
 		if(c1 == 100 && c2 == 111)  return false // do
 		if(c1 == 105 && c2 == 102) return false //if
 		if(c1 == 101 && c2 == 110 && c3 == 100) return false // end
-		//if(c1 == 101 && c2 == 110 && c3 == 100) return false // else
+		if(c1 == 101 && c2 == 108 && c3 == 115 && c4 == 101) return false // else
+		//if(c1 == 101 && c2 == 108 && c3 == 115 && c4 == 101) return false // catch
+		//if(c1 == 101 && c2 == 108 && c3 == 115 && c4 == 101) return false // rescue
 		//if(c1 == 101 && c2 == 110 && c3 == 100) return false // true
 		//if(c1 == 101 && c2 == 110 && c3 == 100) return false // false
 		return true
@@ -120,6 +129,7 @@ var defGrammar = {
 				c1 = input.charCodeAt(++o.pos)
 				if(!(c1 >=48 && c1 <= 57 || c1 >= 65 && c1 <=90 || c1 >= 97 && c1 <= 122 || c1 == 95)){
 					// make a node and add it.
+					if(!o.ast.n) o.ast.n = []
 					o.ast.n.push({
 						type:'Id',
 						value:input.slice(pos, o.pos), 
@@ -142,6 +152,7 @@ var defGrammar = {
 				ch = input.charCodeAt(++o.pos)
 				if(ch === 34){
 					o.pos++
+					if(!o.ast.n) o.ast.n = []
 					o.ast.n.push({
 						type:'String',
 						value:input.slice(pos, o.pos), 
@@ -315,7 +326,7 @@ function makeParser(rules) {
 			var mine = memo && memo[key]
 			var ret
 			if(!mine){
-				mine = p.ast = {type:key, n:[], value:'', start:pos}
+				mine = p.ast = {type:key, value:'', start:pos}
 				if(debug) console.log('No memo', p.input.slice(p.pos, p.pos + 50).replace(/\n/g,'\\n'))
 				ret = rule(p)
 			}
@@ -331,6 +342,7 @@ function makeParser(rules) {
 				var memo = p.memoize[mine.start] || (p.memoize[mine.start] = {})
 				memo[key] = mine
 				mine.end = p.pos
+				if(!parent.n) parent.n = []
 				parent.n.push(mine)
 				parent[key] = mine
 				p.stack.pop()
@@ -338,7 +350,10 @@ function makeParser(rules) {
 			}
 			else if(ret === 0) {
 				var sub = mine.n[0]
-				if(sub) parent.n.push(mine.n[0])
+				if(sub){
+					if(!parent.n) parent.n = []
+					parent.n.push(mine.n[0])
+				}
 				p.stack.pop()
 				return true
 			}
@@ -454,14 +469,19 @@ document.addEventListener('DOMContentLoaded', run)
 <div id='file2'>
 <!--
 
-if a == c do
-
+dialog main do
+	say hi
 end
 
 -->
 </div>
 <div id='file'>
 <!--
+
+%{map:key, map=>key}
+
+if x, do: say "hi", else: "ho"
+
 import "main"
 import "helpers"
 
